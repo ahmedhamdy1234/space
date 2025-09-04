@@ -52,3 +52,13 @@ export const EXPLOSION_MAX_SIZE = 40
 export const EXPLOSION_COLOR = 'orange' // Color of the explosion
 
 export const KEY_PAUSE = 'p' // Key for pausing/resuming the game
+
+// Boss Invader Constants
+export const BOSS_LEVEL_INTERVAL = 5 // Every 5 levels, a boss appears
+export const BOSS_WIDTH = 120
+export const BOSS_HEIGHT = 80
+export const BOSS_HEALTH = 10 // Boss health
+export const BOSS_SPEED = 0.5 // Boss moves slower
+export const BOSS_FIRE_RATE = 0.005 // Boss fires more frequently
+export const BOSS_SCORE_VALUE = 100 // Score for defeating a boss
+export const BOSS_BULLET_SPEED = 5

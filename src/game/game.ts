@@ -32,8 +32,15 @@ import {
   EXPLOSION_MAX_FRAMES, // Import for explosion
   EXPLOSION_COLOR, // Import for explosion
   PLAYER_INVINCIBILITY_DURATION, // Import for player invincibility
+  BOSS_LEVEL_INTERVAL, // Import for boss
+  BOSS_WIDTH, // Import for boss
+  BOSS_HEIGHT, // Import for boss
+  BOSS_HEALTH, // Import for boss
+  BOSS_SPEED, // Import for boss
+  BOSS_FIRE_RATE, // Import for boss
+  BOSS_SCORE_VALUE, // Import for boss
 } from './constants'
-import { Boost, BoostType, Bullet, Invader, Player, Shield, Explosion } from './entities' // Import Explosion
+import { Boost, BoostType, Bullet, Invader, Player, Shield, Explosion, BossInvader } from './entities' // Import Explosion and BossInvader
 
 export type GameState = 'start' | 'playing' | 'gameOver' | 'won' | 'paused' // Added 'paused' state
 
@@ -66,6 +73,7 @@ export class Game {
   private currentScoreMultiplier: number // Current score multiplier
   private playerInvincibilityActive: boolean // New flag for player invincibility
   private playerInvincibilityTimeoutId: number | null // Timeout ID for invincibility
+  private activeBoosts: { type: BoostType, endTime: number }[] // Track active boosts for display
 
   constructor(ctx: CanvasRenderingContext2D, callbacks: GameCallbacks) {
     this.ctx = ctx
@@ -89,6 +97,7 @@ export class Game {
     this.currentScoreMultiplier = 1 // Default multiplier
     this.playerInvincibilityActive = false // Initialize invincibility
     this.playerInvincibilityTimeoutId = null // Initialize invincibility timeout
+    this.activeBoosts = [] // Initialize active boosts array
 
     this.setupEventListeners()
     this.callbacks.onScoreUpdate(this.score)
@@ -184,6 +193,7 @@ export class Game {
       clearTimeout(this.playerInvincibilityTimeoutId)
       this.playerInvincibilityTimeoutId = null
     }
+    this.activeBoosts = [] // Reset active boosts
     this.spawnInvaders()
     this.spawnShields()
     this.score = 0
@@ -195,42 +205,50 @@ export class Game {
   }
 
   private spawnInvaders() {
-    const levelInvaderSpeed = INVADER_SPEED * (1 + (this.currentLevel - 1) * LEVEL_INVADER_SPEED_MULTIPLIER)
-    const levelInvaderFireRate = INVADER_FIRE_RATE + (this.currentLevel - 1) * LEVEL_INVADER_FIRE_RATE_MULTIPLIER
-    let invaderHealth = INVADER_BASE_HEALTH + Math.floor((this.currentLevel - 1) / LEVEL_INVADER_HEALTH_INCREASE_INTERVAL)
+    this.invaders = [] // Clear existing invaders
 
-    // Dynamic invader layout based on level
-    let currentInvaderRows = INVADER_ROWS
-    let currentInvaderCols = INVADER_COLS
-    let currentInvaderStartY = INVADER_START_Y
+    if (this.currentLevel % BOSS_LEVEL_INTERVAL === 0) {
+      // Spawn a boss
+      this.invaders.push(new BossInvader(CANVAS_WIDTH / 2 - BOSS_WIDTH / 2, INVADER_START_Y))
+    } else {
+      // Spawn regular invaders
+      const levelInvaderSpeed = INVADER_SPEED * (1 + (this.currentLevel - 1) * LEVEL_INVADER_SPEED_MULTIPLIER)
+      const levelInvaderFireRate = INVADER_FIRE_RATE + (this.currentLevel - 1) * LEVEL_INVADER_FIRE_RATE_MULTIPLIER
+      let invaderHealth = INVADER_BASE_HEALTH + Math.floor((this.currentLevel - 1) / LEVEL_INVADER_HEALTH_INCREASE_INTERVAL)
 
-    if (this.currentLevel % 3 === 0) { // Every 3rd level, more columns
-      currentInvaderCols = Math.min(INVADER_COLS + 2, 12)
-    } else if (this.currentLevel % 2 === 0) { // Every 2nd level, more rows
-      currentInvaderRows = Math.min(INVADER_ROWS + 1, 7)
-    } else { // Other levels, slightly lower start position
-      currentInvaderStartY = INVADER_START_Y + (this.currentLevel - 1) * 5
-    }
+      // Dynamic invader layout based on level
+      let currentInvaderRows = INVADER_ROWS
+      let currentInvaderCols = INVADER_COLS
+      let currentInvaderStartY = INVADER_START_Y
 
-    // Ensure invaders don't go off screen or overlap too much
-    const actualInvaderSpacingX = CANVAS_WIDTH / currentInvaderCols - INVADER_WIDTH / 2;
-    const actualInvaderSpacingY = INVADER_SPACING_Y;
+      if (this.currentLevel % 3 === 0) { // Every 3rd level, more columns
+        currentInvaderCols = Math.min(INVADER_COLS + 2, 12)
+      } else if (this.currentLevel % 2 === 0) { // Every 2nd level, more rows
+        currentInvaderRows = Math.min(INVADER_ROWS + 1, 7)
+      } else { // Other levels, slightly lower start position
+        currentInvaderStartY = INVADER_START_Y + (this.currentLevel - 1) * 5
+      }
 
-    const invaderShapes: ('square' | 'circle' | 'triangle')[] = ['square', 'circle', 'triangle']
+      // Ensure invaders don't go off screen or overlap too much
+      const actualInvaderSpacingX = CANVAS_WIDTH / currentInvaderCols - INVADER_WIDTH / 2;
+      const actualInvaderSpacingY = INVADER_SPACING_Y;
 
-    for (let row = 0; row < currentInvaderRows; row++) {
-      for (let col = 0; col < currentInvaderCols; col++) {
-        const shape = invaderShapes[row % invaderShapes.length] // Assign shape based on row
-        this.invaders.push(
-          new Invader(
-            INVADER_START_X + col * actualInvaderSpacingX,
-            currentInvaderStartY + row * actualInvaderSpacingY,
-            levelInvaderSpeed,
-            levelInvaderFireRate,
-            invaderHealth, // Pass calculated health
-            shape, // Pass the assigned shape
-          ),
-        )
+      const invaderShapes: ('square' | 'circle' | 'triangle')[] = ['square', 'circle', 'triangle']
+
+      for (let row = 0; row < currentInvaderRows; row++) {
+        for (let col = 0; col < currentInvaderCols; col++) {
+          const shape = invaderShapes[row % invaderShapes.length] // Assign shape based on row
+          this.invaders.push(
+            new Invader(
+              INVADER_START_X + col * actualInvaderSpacingX,
+              currentInvaderStartY + row * actualInvaderSpacingY,
+              levelInvaderSpeed,
+              levelInvaderFireRate,
+              invaderHealth, // Pass calculated health
+              shape, // Pass the assigned shape
+            ),
+          )
+        }
       }
     }
   }
@@ -274,6 +292,7 @@ export class Game {
       clearTimeout(this.playerInvincibilityTimeoutId)
       this.playerInvincibilityTimeoutId = null
     }
+    this.activeBoosts = [] // Clear active boosts
     this.invaders = []
     this.boosts = []
     this.explosions = [] // Reset explosions
@@ -287,9 +306,13 @@ export class Game {
 
     this.player.update()
 
+    // Update active boosts for display and remove expired ones
+    const now = Date.now()
+    this.activeBoosts = this.activeBoosts.filter(boost => boost.endTime > now)
+
     // Update player speed boost timer
     if (this.playerSpeedBoostTimer && this.playerSpeedBoostEndTime) {
-      if (Date.now() >= this.playerSpeedBoostEndTime) {
+      if (now >= this.playerSpeedBoostEndTime) {
         this.player.speed = this.player.baseSpeed // Reset speed
         this.playerSpeedBoostTimer = null
         this.playerSpeedBoostEndTime = null
@@ -304,7 +327,7 @@ export class Game {
 
     // Update player score multiplier boost timer
     if (this.playerScoreMultiplierTimer && this.playerScoreMultiplierEndTime) {
-      if (Date.now() >= this.playerScoreMultiplierEndTime) {
+      if (now >= this.playerScoreMultiplierEndTime) {
         this.currentScoreMultiplier = 1 // Reset multiplier
         this.playerScoreMultiplierTimer = null
         this.playerScoreMultiplierEndTime = null
@@ -400,7 +423,7 @@ export class Game {
   }
 
   private checkCollisions() {
-    // Player bullets vs Invaders
+    // Player bullets vs Invaders (including Boss)
     this.player.bullets.forEach((pBullet) => {
       this.invaders.forEach((invader) => {
         if (invader.isAlive && this.checkCollision(pBullet, invader)) {
@@ -408,7 +431,7 @@ export class Game {
           pBullet.isOffscreen = true // Mark player bullet for removal
 
           if (!invader.isAlive) { // Only award score if invader is destroyed
-            this.score += SCORE_PER_INVADER * this.currentScoreMultiplier
+            this.score += (invader instanceof BossInvader ? BOSS_SCORE_VALUE : SCORE_PER_INVADER) * this.currentScoreMultiplier
             this.callbacks.onScoreUpdate(this.score)
 
             // Create explosion when invader is destroyed
@@ -421,7 +444,7 @@ export class Game {
               EXPLOSION_COLOR
             ))
 
-            // Randomly drop a boost
+            // Randomly drop a boost (bosses could have higher drop rate or special boosts)
             if (Math.random() < BOOST_DROP_RATE) {
               const boostTypes: BoostType[] = ['speed', 'extraLife', 'shieldRepair', 'doubleShot', 'scoreMultiplier'] // Added 'scoreMultiplier'
               const randomBoostType = boostTypes[Math.floor(Math.random() * boostTypes.length)]
@@ -487,6 +510,13 @@ export class Game {
 
   private applyBoostEffect(type: BoostType) {
     console.log(`Applying boost: ${type}`);
+    const now = Date.now()
+    const endTime = now + BOOST_DURATION
+
+    // Add to activeBoosts for display
+    this.activeBoosts = this.activeBoosts.filter(b => b.type !== type) // Remove existing of same type
+    this.activeBoosts.push({ type, endTime })
+
     switch (type) {
       case 'speed':
         // Clear any existing speed boost timer to prevent conflicts
@@ -500,7 +530,7 @@ export class Game {
           this.playerSpeedBoostEndTime = null
           console.log('Player speed boost ended.')
         }, BOOST_DURATION)
-        this.playerSpeedBoostEndTime = Date.now() + BOOST_DURATION
+        this.playerSpeedBoostEndTime = endTime
         console.log('Player speed boosted!');
         break
       case 'extraLife':
@@ -539,10 +569,47 @@ export class Game {
           this.playerScoreMultiplierEndTime = null;
           console.log('Player score multiplier boost ended.');
         }, BOOST_DURATION);
-        this.playerScoreMultiplierEndTime = Date.now() + BOOST_DURATION;
+        this.playerScoreMultiplierEndTime = endTime
         console.log(`Score multiplier activated! x${SCORE_MULTIPLIER_VALUE}`);
         break;
     }
+  }
+
+  private drawBoostTimers() {
+    const now = Date.now()
+    let displayX = 10 // Starting X position for boost icons
+    const displayY = CANVAS_HEIGHT - 30 // Y position at bottom of canvas
+
+    this.activeBoosts.forEach(boost => {
+      const timeLeft = Math.max(0, Math.ceil((boost.endTime - now) / 1000)) // Time in seconds
+      if (timeLeft === 0) return // Don't draw if expired
+
+      let icon = ''
+      let color = 'white'
+      switch (boost.type) {
+        case 'speed':
+          icon = '⚡'
+          color = 'cyan'
+          break
+        case 'doubleShot':
+          icon = '💥'
+          color = 'purple'
+          break
+        case 'scoreMultiplier':
+          icon = '💰'
+          color = 'gold'
+          break
+        // No display for instant boosts like extraLife, shieldRepair
+        default:
+          return
+      }
+
+      this.ctx.fillStyle = color
+      this.ctx.font = '16px Arial'
+      this.ctx.textAlign = 'left'
+      this.ctx.fillText(`${icon} ${timeLeft}s`, displayX, displayY)
+      displayX += this.ctx.measureText(`${icon} ${timeLeft}s`).width + 15 // Move X for next icon
+    })
   }
 
   private draw() {
@@ -565,6 +632,21 @@ export class Game {
     })
 
     this.explosions.forEach(explosion => explosion.draw(this.ctx)) // Draw explosions
+
+    // --- On-canvas UI elements ---
+    this.ctx.fillStyle = 'white'
+    this.ctx.font = '18px Arial'
+    this.ctx.textAlign = 'left'
+    this.ctx.fillText(`Score: ${this.score}`, 10, 25)
+
+    this.ctx.textAlign = 'center'
+    this.ctx.fillText(`Level: ${this.currentLevel}`, CANVAS_WIDTH / 2, 25)
+
+    this.ctx.textAlign = 'right'
+    this.ctx.fillText(`Lives: ${this.lives}`, CANVAS_WIDTH - 10, 25)
+    // --- End On-canvas UI elements ---
+
+    this.drawBoostTimers() // Draw active boost timers
   }
 
   private loop = () => {
@@ -614,6 +696,7 @@ export class Game {
       this.player.isInvincible = false;
     }
     this.player.isFiringHeld = false; // Ensure firing is stopped on game over/win
+    this.activeBoosts = [] // Clear active boosts on game end
   }
 
   public destroy() {

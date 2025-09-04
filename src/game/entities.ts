@@ -24,6 +24,12 @@ import {
   EXPLOSION_MAX_SIZE, // Import for explosion
   EXPLOSION_MAX_FRAMES, // Import for explosion
   EXPLOSION_COLOR, // Import for explosion
+  BOSS_WIDTH, // Import for boss
+  BOSS_HEIGHT, // Import for boss
+  BOSS_HEALTH, // Import for boss
+  BOSS_SPEED, // Import for boss
+  BOSS_FIRE_RATE, // Import for boss
+  BOSS_BULLET_SPEED, // Import for boss
 } from './constants'
 
 export class Player {
@@ -62,8 +68,36 @@ export class Player {
       // Flash effect: skip drawing every other interval when invincible
       return
     }
+
+    ctx.save()
+    ctx.translate(this.x + this.width / 2, this.y + this.height / 2) // Translate to center for easier drawing
+
+    // Main body (triangular shape)
     ctx.fillStyle = 'lime'
-    ctx.fillRect(this.x, this.y, this.width, this.height)
+    ctx.beginPath()
+    ctx.moveTo(0, -this.height / 2) // Top point
+    ctx.lineTo(this.width / 2, this.height / 2) // Bottom right
+    ctx.lineTo(-this.width / 2, this.height / 2) // Bottom left
+    ctx.closePath()
+    ctx.fill()
+    ctx.strokeStyle = 'white'
+    ctx.lineWidth = 1
+    ctx.stroke()
+
+    // Cockpit
+    ctx.fillStyle = 'cyan'
+    ctx.beginPath()
+    ctx.arc(0, -this.height / 4, this.width / 8, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = 'darkblue'
+    ctx.stroke()
+
+    // Engines (simple rectangles at the back)
+    ctx.fillStyle = 'orange'
+    ctx.fillRect(-this.width / 4, this.height / 2 - 5, this.width / 8, 10)
+    ctx.fillRect(this.width / 8, this.height / 2 - 5, this.width / 8, 10)
+
+    ctx.restore()
   }
 
   update() {
@@ -152,38 +186,64 @@ export class Invader {
   draw(ctx: CanvasRenderingContext2D) {
     if (!this.isAlive) return
 
-    // Determine color based on health
-    let color = 'red'
+    let baseColor = 'red'
     if (this.health === 2) {
-      color = 'darkred'
+      baseColor = 'darkred'
     } else if (this.health >= 3) {
-      color = 'maroon'
+      baseColor = 'maroon'
     }
 
-    ctx.fillStyle = color
+    ctx.fillStyle = baseColor
+    ctx.strokeStyle = 'white' // Outline for better definition
+    ctx.lineWidth = 1
 
-    // Draw different shapes based on this.shape
+    ctx.save()
+    ctx.translate(this.x + this.width / 2, this.y + this.height / 2) // Translate to center
+
     switch (this.shape) {
       case 'square':
-        ctx.fillRect(this.x, this.y, this.width, this.height)
+        ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height)
+        ctx.strokeRect(-this.width / 2, -this.height / 2, this.width, this.height)
+        // Eyes
+        ctx.fillStyle = 'yellow'
+        ctx.beginPath()
+        ctx.arc(-this.width / 4, -this.height / 4, this.width / 8, 0, Math.PI * 2)
+        ctx.arc(this.width / 4, -this.height / 4, this.width / 8, 0, Math.PI * 2)
+        ctx.fill()
         break
       case 'circle':
         ctx.beginPath()
-        ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width / 2, 0, Math.PI * 2)
+        ctx.arc(0, 0, this.width / 2, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.stroke()
+        // Central eye
+        ctx.fillStyle = 'yellow'
+        ctx.beginPath()
+        ctx.arc(0, 0, this.width / 4, 0, Math.PI * 2)
         ctx.fill()
         break
       case 'triangle':
         ctx.beginPath()
-        ctx.moveTo(this.x + this.width / 2, this.y)
-        ctx.lineTo(this.x + this.width, this.y + this.height)
-        ctx.lineTo(this.x, this.y + this.height)
+        ctx.moveTo(0, -this.height / 2)
+        ctx.lineTo(this.width / 2, this.height / 2)
+        ctx.lineTo(-this.width / 2, this.height / 2)
         ctx.closePath()
+        ctx.fill()
+        ctx.stroke()
+        // Small lights
+        ctx.fillStyle = 'cyan'
+        ctx.beginPath()
+        ctx.arc(-this.width / 4, this.height / 4, this.width / 10, 0, Math.PI * 2)
+        ctx.arc(this.width / 4, this.height / 4, this.width / 10, 0, Math.PI * 2)
         ctx.fill()
         break
       default:
-        ctx.fillRect(this.x, this.y, this.width, this.height) // Default to square
+        ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height) // Default to square
+        ctx.strokeRect(-this.width / 2, -this.height / 2, this.width, this.height)
         break
     }
+
+    ctx.restore()
 
     // Optionally draw health bar or indicator for multi-hit invaders
     if (this.maxHealth > 1) {
@@ -226,6 +286,81 @@ export class Invader {
     if (this.health <= 0) {
       this.isAlive = false
     }
+  }
+}
+
+export class BossInvader extends Invader {
+  constructor(x: number, y: number) {
+    super(x, y, BOSS_SPEED, BOSS_FIRE_RATE, BOSS_HEALTH, 'square') // Boss is always 'square' for now
+    this.width = BOSS_WIDTH
+    this.height = BOSS_HEIGHT
+    this.maxHealth = BOSS_HEALTH // Ensure maxHealth is set for drawing health bar
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    if (!this.isAlive) return
+
+    // Boss specific drawing
+    ctx.save()
+    ctx.translate(this.x + this.width / 2, this.y + this.height / 2)
+
+    // Main body
+    ctx.fillStyle = 'purple'
+    ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height)
+    ctx.strokeStyle = 'magenta'
+    ctx.lineWidth = 2
+    ctx.strokeRect(-this.width / 2, -this.height / 2, this.width, this.height)
+
+    // Core/Eye
+    ctx.fillStyle = 'red'
+    ctx.beginPath()
+    ctx.arc(0, 0, this.width / 4, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = 'yellow'
+    ctx.stroke()
+
+    // Cannons
+    ctx.fillStyle = 'gray'
+    ctx.fillRect(-this.width / 2 + 5, this.height / 2 - 10, 10, 10)
+    ctx.fillRect(this.width / 2 - 15, this.height / 2 - 10, 10, 10)
+
+    ctx.restore()
+
+    // Health bar for boss
+    const healthBarWidth = this.width * (this.health / this.maxHealth)
+    ctx.fillStyle = 'red'
+    ctx.fillRect(this.x, this.y - 10, healthBarWidth, 5)
+    ctx.strokeStyle = 'white'
+    ctx.strokeRect(this.x, this.y - 10, this.width, 5)
+  }
+
+  shoot() {
+    // Boss can shoot multiple bullets or a wider shot
+    this.bullets.push(
+      new Bullet(
+        this.x + this.width / 2 - BULLET_WIDTH / 2,
+        this.y + this.height,
+        BOSS_BULLET_SPEED,
+        'invader',
+      ),
+    )
+    // Example: double shot for boss
+    this.bullets.push(
+      new Bullet(
+        this.x + this.width / 4 - BULLET_WIDTH / 2,
+        this.y + this.height,
+        BOSS_BULLET_SPEED,
+        'invader',
+      ),
+    )
+    this.bullets.push(
+      new Bullet(
+        this.x + this.width * 3 / 4 - BULLET_WIDTH / 2,
+        this.y + this.height,
+        BOSS_BULLET_SPEED,
+        'invader',
+      ),
+    )
   }
 }
 
