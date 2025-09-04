@@ -46,6 +46,9 @@ export class Player {
   hasDoubleShot: boolean // New property for double shot boost
   isFiringHeld: boolean // New property to track if fire button is held
   isInvincible: boolean // New property for invincibility
+  maxBullets: number // Maximum number of bullets
+  currentBullets: number // Current number of bullets
+  level: number // Add level property
 
   constructor() {
     this.width = PLAYER_WIDTH
@@ -61,6 +64,9 @@ export class Player {
     this.hasDoubleShot = false // Initialize double shot to false
     this.isFiringHeld = false // Initialize isFiringHeld to false
     this.isInvincible = false // Initialize invincibility
+    this.maxBullets = 3 // Initial number of bullets
+    this.currentBullets = this.maxBullets // Set current bullets to max
+    this.level = 1 // Initialize level
   }
 
   draw(ctx: CanvasRenderingContext2D) {
@@ -110,7 +116,7 @@ export class Player {
 
     // Continuous firing logic
     const now = Date.now()
-    if ((this.isMovingLeft || this.isMovingRight || this.isFiringHeld) && (now - this.lastFireTime > PLAYER_FIRE_RATE_LIMIT)) {
+    if (this.isFiringHeld && (now - this.lastFireTime > PLAYER_FIRE_RATE_LIMIT)) {
       this.fireBullet()
       this.lastFireTime = now
     }
@@ -122,35 +128,41 @@ export class Player {
   }
 
   fireBullet() {
-    // Single shot
-    this.bullets.push(
-      new Bullet(
-        this.x + this.width / 2 - BULLET_WIDTH / 2,
-        this.y,
-        -PLAYER_BULLET_SPEED,
-        'player',
-      ),
-    )
-
-    // Double shot if boost is active
-    if (this.hasDoubleShot) {
-      this.bullets.push(
-        new Bullet(
-          this.x + this.width / 2 - BULLET_WIDTH / 2 - DOUBLE_SHOT_BULLET_OFFSET, // Left bullet
-          this.y,
-          -PLAYER_BULLET_SPEED,
-          'player',
-        ),
-      )
-      this.bullets.push(
-        new Bullet(
-          this.x + this.width / 2 - BULLET_WIDTH / 2 + DOUBLE_SHOT_BULLET_OFFSET, // Right bullet
-          this.y,
-          -PLAYER_BULLET_SPEED,
-          'player',
-        ),
-      )
+    let bulletsToFire = 1;
+    if (this.level >= 5) {
+      bulletsToFire = 3;
     }
+    if (this.hasDoubleShot) {
+      bulletsToFire = 5;
+    }
+
+    for (let i = 0; i < bulletsToFire; i++) {
+      let offsetX = 0;
+      if (bulletsToFire === 3) {
+        offsetX = (i - 1) * DOUBLE_SHOT_BULLET_OFFSET;
+      } else if (bulletsToFire === 5) {
+        offsetX = (i - 2) * (DOUBLE_SHOT_BULLET_OFFSET);
+      }
+      this.bullets.push(
+        new Bullet(
+          this.x + this.width / 2 - BULLET_WIDTH / 2 + offsetX,
+          this.y,
+          -PLAYER_BULLET_SPEED,
+          'player',
+        ),
+      );
+    }
+  }
+
+  // Method to increase the number of bullets
+  increaseBullets(amount: number) {
+    this.maxBullets = Math.min(5, this.maxBullets + amount); // Cap at 5
+    this.currentBullets = this.maxBullets; // Refill bullets
+  }
+
+  // Method to reset bullets at the start of a level
+  resetBullets() {
+    this.currentBullets = this.maxBullets;
   }
 }
 

@@ -278,13 +278,15 @@ export class Game {
     this.currentLevel++
     this.callbacks.onLevelUpdate(this.currentLevel)
     this.player = new Player() // Reset player position and speed
+    this.player.level = this.currentLevel; // Set player level
     this.playerSpeedBoostTimer = null
     this.playerSpeedBoostEndTime = null
     this.playerDoubleShotBoostTimer = null
-    this.player.hasDoubleShot = false
     this.playerScoreMultiplierTimer = null // Reset score multiplier timer
     this.playerScoreMultiplierEndTime = null // Reset score multiplier end time
     this.currentScoreMultiplier = 1 // Reset multiplier
+    this.player.speed = this.player.baseSpeed
+    this.player.hasDoubleShot = false
     this.player.isFiringHeld = false // Reset firing held flag
     this.player.isInvincible = false // Reset player invincibility
     this.playerInvincibilityActive = false
