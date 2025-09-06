@@ -10,6 +10,11 @@ export default defineConfig({
   server: {
     allowedHosts: [
       '.csb.app'           
-    ]
+    ],
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    }
   }
 })
