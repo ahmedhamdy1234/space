@@ -30,6 +30,17 @@ import {
   BOSS_SPEED, // Import for boss
   BOSS_FIRE_RATE, // Import for boss
   BOSS_BULLET_SPEED, // Import for boss
+  MISSILE_WIDTH, // Import for missile
+  MISSILE_HEIGHT, // Import for missile
+  MISSILE_SPEED, // Import for missile
+  MISSILE_DAMAGE, // Import for missile
+  MISSILE_FIRE_RATE_LIMIT, // Import for missile fire rate
+  MISSILE_INITIAL_COUNT, // Import for initial missile count
+  KAMIKAZE_INVADER_WIDTH, // Import for Kamikaze Invader
+  KAMIKAZE_INVADER_HEIGHT, // Import for Kamikaze Invader
+  KAMIKAZE_INVADER_SPEED, // Import for Kamikaze Invader
+  KAMIKAZE_INVADER_HEALTH, // Import for Kamikaze Invader
+  KAMIKAZE_INVADER_DAMAGE, // Import for Kamikaze Invader
 } from './constants'
 
 export class Player {
@@ -49,6 +60,9 @@ export class Player {
   maxBullets: number // Maximum number of bullets
   currentBullets: number // Current number of bullets
   level: number // Add level property
+  hasPiercingShot: boolean // New property for piercing shot boost
+  missileCount: number // New property for missile count
+  lastMissileFireTime: number // New property for missile cooldown
 
   constructor() {
     this.width = PLAYER_WIDTH
@@ -67,6 +81,9 @@ export class Player {
     this.maxBullets = 3 // Initial number of bullets
     this.currentBullets = this.maxBullets // Set current bullets to max
     this.level = 1 // Initialize level
+    this.hasPiercingShot = false // Initialize piercing shot to false
+    this.missileCount = MISSILE_INITIAL_COUNT // Initialize missile count
+    this.lastMissileFireTime = 0 // Initialize missile cooldown
   }
 
   draw(ctx: CanvasRenderingContext2D) {
@@ -102,6 +119,18 @@ export class Player {
     ctx.fillStyle = 'orange'
     ctx.fillRect(-this.width / 4, this.height / 2 - 5, this.width / 8, 10)
     ctx.fillRect(this.width / 8, this.height / 2 - 5, this.width / 8, 10)
+
+    // Simple thrust animation
+    const flameHeight = 5 + Math.random() * 5; // Flickering effect
+    ctx.fillStyle = `rgba(255, ${165 + Math.random() * 90}, 0, ${0.7 + Math.random() * 0.3})`; // Orange to yellow, flickering opacity
+    ctx.beginPath();
+    ctx.moveTo(-this.width / 4, this.height / 2 + 5);
+    ctx.lineTo(-this.width / 8, this.height / 2 + 5 + flameHeight);
+    ctx.lineTo(this.width / 8, this.height / 2 + 5 + flameHeight);
+    ctx.lineTo(this.width / 4, this.height / 2 + 5);
+    ctx.closePath();
+    ctx.fill();
+
 
     ctx.restore()
   }
@@ -149,8 +178,33 @@ export class Player {
           this.y,
           -PLAYER_BULLET_SPEED,
           'player',
+          this.hasPiercingShot, // Pass piercing shot status
+          1, // Default damage for regular bullets
         ),
       );
+    }
+  }
+
+  fireMissile() {
+    const now = Date.now()
+    if (this.missileCount > 0 && (now - this.lastMissileFireTime > MISSILE_FIRE_RATE_LIMIT)) {
+      this.bullets.push(
+        new Missile(
+          this.x + this.width / 2 - MISSILE_WIDTH / 2,
+          this.y,
+          -MISSILE_SPEED,
+          'player',
+          false, // Missiles are not piercing by default, can be changed
+          MISSILE_DAMAGE,
+        ),
+      )
+      this.missileCount--
+      this.lastMissileFireTime = now
+      console.log(`Missile fired! Remaining: ${this.missileCount}`)
+    } else if (this.missileCount === 0) {
+      console.log('No missiles left!')
+    } else {
+      console.log('Missile on cooldown.')
     }
   }
 
@@ -289,12 +343,14 @@ export class Invader {
         this.y + this.height,
         INVADER_BULLET_SPEED,
         'invader',
+        false,
+        1, // Default damage for invader bullets
       ),
     )
   }
 
-  hit() {
-    this.health--
+  hit(damage: number = 1) {
+    this.health -= damage
     if (this.health <= 0) {
       this.isAlive = false
     }
@@ -354,6 +410,8 @@ export class BossInvader extends Invader {
         this.y + this.height,
         BOSS_BULLET_SPEED,
         'invader',
+        false,
+        1, // Default damage for boss bullets
       ),
     )
     // Example: double shot for boss
@@ -363,6 +421,8 @@ export class BossInvader extends Invader {
         this.y + this.height,
         BOSS_BULLET_SPEED,
         'invader',
+        false,
+        1,
       ),
     )
     this.bullets.push(
@@ -371,8 +431,69 @@ export class BossInvader extends Invader {
         this.y + this.height,
         BOSS_BULLET_SPEED,
         'invader',
+        false,
+        1,
       ),
     )
+  }
+}
+
+export class KamikazeInvader extends Invader {
+  damage: number
+
+  constructor(x: number, y: number) {
+    super(x, y, KAMIKAZE_INVADER_SPEED, 0, KAMIKAZE_INVADER_HEALTH, 'triangle') // Kamikaze doesn't shoot
+    this.width = KAMIKAZE_INVADER_WIDTH
+    this.height = KAMIKAZE_INVADER_HEIGHT
+    this.damage = KAMIKAZE_INVADER_DAMAGE
+    this.maxHealth = KAMIKAZE_INVADER_HEALTH
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    if (!this.isAlive) return
+
+    ctx.save()
+    ctx.translate(this.x + this.width / 2, this.y + this.height / 2)
+
+    // Kamikaze specific drawing (e.g., a red triangle with a warning sign)
+    ctx.fillStyle = 'darkred'
+    ctx.beginPath()
+    ctx.moveTo(0, -this.height / 2)
+    ctx.lineTo(this.width / 2, this.height / 2)
+    ctx.lineTo(-this.width / 2, this.height / 2)
+    ctx.closePath()
+    ctx.fill()
+    ctx.strokeStyle = 'yellow'
+    ctx.lineWidth = 2
+    ctx.stroke()
+
+    // Warning sign
+    ctx.fillStyle = 'yellow'
+    ctx.font = '12px Arial'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('!', 0, 0)
+
+    ctx.restore()
+  }
+
+  update() {
+    if (!this.isAlive) return
+    // Kamikaze invaders move straight down
+    this.y += this.speed
+    if (this.y > CANVAS_HEIGHT) {
+      this.isAlive = false // Remove if offscreen
+    }
+    // Kamikaze invaders do not shoot, so no bullet update
+  }
+
+  // Kamikaze invaders don't move horizontally with the wave
+  moveDown() {
+    // Do nothing, they already move down
+  }
+
+  shoot() {
+    // Kamikaze invaders do not shoot
   }
 }
 
@@ -384,8 +505,10 @@ export class Bullet {
   speed: number
   type: 'player' | 'invader'
   isOffscreen: boolean
+  isPiercing: boolean // New property for piercing bullets
+  damage: number // New property for bullet damage
 
-  constructor(x: number, y: number, speed: number, type: 'player' | 'invader') {
+  constructor(x: number, y: number, speed: number, type: 'player' | 'invader', isPiercing: boolean = false, damage: number = 1) {
     this.x = x
     this.y = y
     this.width = BULLET_WIDTH
@@ -393,10 +516,12 @@ export class Bullet {
     this.speed = speed
     this.type = type
     this.isOffscreen = false
+    this.isPiercing = isPiercing // Initialize piercing status
+    this.damage = damage // Initialize damage
   }
 
   draw(ctx: CanvasRenderingContext2D) {
-    ctx.fillStyle = this.type === 'player' ? 'yellow' : 'orange'
+    ctx.fillStyle = this.type === 'player' ? (this.isPiercing ? 'lime' : 'yellow') : 'orange' // Green for piercing
     ctx.fillRect(this.x, this.y, this.width, this.height)
   }
 
@@ -405,6 +530,23 @@ export class Bullet {
     if (this.y < 0 || this.y > CANVAS_HEIGHT) {
       this.isOffscreen = true
     }
+  }
+}
+
+export class Missile extends Bullet {
+  constructor(x: number, y: number, speed: number, type: 'player' | 'invader', isPiercing: boolean = false, damage: number = MISSILE_DAMAGE) {
+    super(x, y, speed, type, isPiercing, damage)
+    this.width = MISSILE_WIDTH
+    this.height = MISSILE_HEIGHT
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    ctx.fillStyle = 'red' // Missiles are red
+    ctx.fillRect(this.x, this.y, this.width, this.height)
+
+    // Add a small flame effect at the bottom
+    ctx.fillStyle = 'orange'
+    ctx.fillRect(this.x + this.width / 4, this.y + this.height, this.width / 2, 5)
   }
 }
 
@@ -459,7 +601,7 @@ export class Shield {
   }
 }
 
-export type BoostType = 'speed' | 'extraLife' | 'shieldRepair' | 'doubleShot' | 'scoreMultiplier' // Added 'scoreMultiplier'
+export type BoostType = 'speed' | 'extraLife' | 'shieldRepair' | 'doubleShot' | 'scoreMultiplier' | 'piercingShot' // Added 'piercingShot'
 
 export class Boost {
   x: number
@@ -508,6 +650,10 @@ export class Boost {
       case 'scoreMultiplier':
         text = 'x2 Score'
         textColor = 'gold'
+        break
+      case 'piercingShot':
+        text = 'Pierce'
+        textColor = 'lime'
         break
     }
 
