@@ -395,7 +395,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   };
 
   return (
-    <div className="relative bg-gray-900 rounded-lg shadow-lg overflow-hidden">
+    <div className="relative bg-gray-900 rounded-lg shadow-lg overflow-hidden" style={{ width: '90vw', maxWidth: '1200px', height: '70vh', maxHeight: '800px' }}>
       <Starfield level={level} /> {/* Pass the current level and zoom level to Starfield */}
       <canvas
         ref={canvasRef}
@@ -499,7 +499,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
                   </li>
                   <li><b>Boss Invaders:</b> Appear every few levels. They are tougher and have more health.</li>
                   <li><b>Kamikaze Invaders:</b> These fast, red triangular invaders fly directly towards you. Destroy them before they collide, as they deal damage on impact!</li>
-                  <li><b>Diving Invaders:</b> These invaders dive directly towards the player, attempting to collide.</li>
+                  <li><b>Diving Invaders:</b> These invaders dive directly towards you, attempting to collide.</li>
                   <li><b>Split Invaders:</b> When destroyed, these invaders split into two smaller, weaker invaders.</li>
                   <li><b>Mine-Laying Invaders:</b> These invaders periodically drop mines that explode on contact with the player or player bullets.</li>
                   <li><b>Player Invincibility:</b> After taking damage, you become temporarily invincible (flashing effect).</li>
@@ -670,11 +670,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
                           : 'bg-lime-500 hover:bg-lime-600 text-gray-900'
                         }
                       `}
-                    >
-                      {playerUpgrades.maxLives >= MAX_UPGRADE_LEVELS.maxLives ? 'MAXED' :'Upgrade'}
+                    >                      {playerUpgrades.maxLives >= MAX_UPGRADE_LEVELS.maxLives ? 'MAXED' :'Upgrade'}
                     </button>
                   </div>
 
+```xml
                   {/* Shield Health Upgrade */}
                   <div className="bg-gray-800 p-6 rounded-lg shadow-xl border border-purple-700">
                     <h3 className="text-3xl font-bold text-blue-400 mb-3">Shield Health</h3>
@@ -888,52 +888,52 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
       {/* Transparent control buttons */}
       {gameState === 'playing' && (
-        <>
+        <div className="absolute bottom-4 left-0 w-full flex justify-around z-20">
           <button
-            className="absolute bottom-4 left-4 bg-gray-700 bg-opacity-50 hover:bg-opacity-75 text-white rounded-full w-16 h-16 flex items-center justify-center"
-            onTouchStart={handleMoveLeftStart}
-            onTouchEnd={handleMoveLeftEnd}
-            onMouseDown={handleMoveLeftStart}
-            onMouseUp={handleMoveLeftEnd}
-            onMouseLeave={handleMoveLeftEnd}
+            className="bg-gray-700 bg-opacity-30 hover:bg-opacity-50 text-white rounded-full w-16 h-16 flex items-center justify-center"
+            onTouchStart={() => { handleMoveLeftStart(); }}
+            onTouchEnd={() => { handleMoveLeftEnd(); }}
+            onMouseDown={() => { handleMoveLeftStart(); }}
+            onMouseUp={() => { handleMoveLeftEnd(); }}
+            onMouseLeave={() => { handleMoveLeftEnd(); }}
             title="Move Left"
           >
             <ArrowLeft size={36} />
           </button>
           <button
-            className="absolute bottom-4 right-4 bg-gray-700 bg-opacity-50 hover:bg-opacity-75 text-white rounded-full w-16 h-16 flex items-center justify-center"
-            onTouchStart={handleMoveRightStart}
-            onTouchEnd={handleMoveRightEnd}
-            onMouseDown={handleMoveRightStart}
-            onMouseUp={handleMoveRightEnd}
-            onMouseLeave={handleMoveRightEnd}
-            title="Move Right"
-          >
-            <ArrowLeft size={36} style={{ transform: 'rotate(180deg)' }} />
-          </button>
-          <button
-            className="absolute bottom-4 left-24 bg-gray-700 bg-opacity-50 hover:bg-opacity-75 text-white rounded-full w-16 h-16 flex items-center justify-center"
-            onTouchStart={handleFireStart}
-            onTouchEnd={handleFireEnd}
-            onMouseDown={handleFireStart}
-            onMouseUp={handleFireEnd}
-            onMouseLeave={handleFireEnd}
+            className="bg-gray-700 bg-opacity-30 hover:bg-opacity-50 text-white rounded-full w-16 h-16 flex items-center justify-center"
+            onTouchStart={() => { handleFireStart(); }}
+            onTouchEnd={() => { handleFireEnd(); }}
+            onMouseDown={() => { handleFireStart(); }}
+            onMouseUp={() => { handleFireEnd(); }}
+            onMouseLeave={() => { handleFireEnd(); }}
             title="Fire"
           >
             Fire
           </button>
           <button
-            className="absolute bottom-4 left-44 bg-gray-700 bg-opacity-50 hover:bg-opacity-75 text-white rounded-full w-16 h-16 flex items-center justify-center"
-            onTouchStart={handleMissileStart}
-            onTouchEnd={handleMissileEnd}
-            onMouseDown={handleMissileStart}
-            onMouseUp={handleMissileEnd}
-            onMouseLeave={handleMissileEnd}
+            className="bg-gray-700 bg-opacity-30 hover:bg-opacity-50 text-white rounded-full w-16 h-16 flex items-center justify-center"
+            onTouchStart={() => { handleMissileStart(); }}
+            onTouchEnd={() => { handleMissileEnd(); }}
+            onMouseDown={() => { handleMissileStart(); }}
+            onMouseUp={() => { handleMissileEnd(); }}
+            onMouseLeave={() => { handleMissileEnd(); }}
             title="Fire Missile"
           >
             Missile
           </button>
-        </>
+          <button
+            className="bg-gray-700 bg-opacity-30 hover:bg-opacity-50 text-white rounded-full w-16 h-16 flex items-center justify-center"
+            onTouchStart={() => { handleMoveRightStart(); }}
+            onTouchEnd={() => { handleMoveRightEnd(); }}
+            onMouseDown={() => { handleMoveRightStart(); }}
+            onMouseUp={() => { handleMoveRightEnd(); }}
+            onMouseLeave={() => { handleMoveRightEnd(); }}
+            title="Move Right"
+          >
+            <ArrowLeft size={36} style={{ transform: 'rotate(180deg)' }} />
+          </button>
+        </div>
       )}
     </div>
   )
