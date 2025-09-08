@@ -30,17 +30,44 @@ import {
   BOSS_SPEED, // Import for boss
   BOSS_FIRE_RATE, // Import for boss
   BOSS_BULLET_SPEED, // Import for boss
+  BOSS_BULLET_DAMAGE, // Import for boss bullet damage
   MISSILE_WIDTH, // Import for missile
   MISSILE_HEIGHT, // Import for missile
   MISSILE_SPEED, // Import for missile
   MISSILE_DAMAGE, // Import for missile
   MISSILE_FIRE_RATE_LIMIT, // Import for missile fire rate
-  MISSILE_INITIAL_COUNT, // Import for initial missile count
+  MISSILE_INITIAL_COUNT, // Import MISSILE_INITIAL_COUNT
   KAMIKAZE_INVADER_WIDTH, // Import for Kamikaze Invader
   KAMIKAZE_INVADER_HEIGHT, // Import for Kamikaze Invader
   KAMIKAZE_INVADER_SPEED, // Import for Kamikaze Invader
   KAMIKAZE_INVADER_HEALTH, // Import for Kamikaze Invader
   KAMIKAZE_INVADER_DAMAGE, // Import for Kamikaze Invader
+  DIVING_INVADER_WIDTH, // Import for Diving Invader
+  DIVING_INVADER_HEIGHT, // Import for Diving Invader
+  DIVING_INVADER_SPEED, // Import for Diving Invader
+  DIVING_INVADER_HEALTH, // Import for Diving Invader
+  DIVING_INVADER_DAMAGE, // Import for Diving Invader
+  DEFAULT_SHIP_SKIN, // Import default ship skin
+  SPLIT_INVADER_WIDTH, // Import for Split Invader
+  SPLIT_INVADER_HEIGHT, // Import for Split Invader
+  SPLIT_INVADER_HEALTH, // Import for Split Invader
+  SPLIT_INVADER_SPEED, // Import for Split Invader
+  SPLIT_INVADER_FIRE_RATE, // Import for Split Invader fire rate
+  SPLIT_INVADER_CHILD_WIDTH, // Import for Split Invader child
+  SPLIT_INVADER_CHILD_HEIGHT, // Import for Split Invader child
+  SPLIT_INVADER_CHILD_HEALTH, // Import for Split Invader child
+  SPLIT_INVADER_CHILD_SPEED, // Import for Split Invader child speed
+  SPLIT_INVADER_CHILD_FIRE_RATE, // Import for Split Invader child fire rate
+  SPLIT_INVADER_CHILD_COUNT, // Import for Split Invader child count
+  MINE_LAYING_INVADER_WIDTH, // Import for Mine-Laying Invader
+  MINE_LAYING_INVADER_HEIGHT, // Import for Mine-Laying Invader
+  MINE_LAYING_INVADER_HEALTH, // Import for Mine-Laying Invader
+  MINE_LAYING_INVADER_SPEED, // Import for Mine-Laying Invader
+  MINE_LAYING_INVADER_FIRE_RATE, // Import for Mine-Laying Invader fire rate
+  MINE_LAYING_INVADER_MINE_DROP_RATE, // Import for Mine-Laying Invader mine drop rate
+  MINE_SIZE, // Import for Mine size
+  MINE_DAMAGE, // Import for Mine damage
+  MINE_LIFETIME, // Import for Mine lifetime
 } from './constants'
 
 export class Player {
@@ -54,36 +81,36 @@ export class Player {
   isMovingRight: boolean
   bullets: Bullet[]
   lastFireTime: number // Track the last time a bullet was fired
-  hasDoubleShot: boolean // New property for double shot boost
+  hasDoubleShot: boolean // New property for temporary double shot boost
   isFiringHeld: boolean // New property to track if fire button is held
   isInvincible: boolean // New property for invincibility
-  maxBullets: number // Maximum number of bullets
-  currentBullets: number // Current number of bullets
+  baseShotCount: number // Base number of bullets (replaces maxBullets and isLevel4TripleShotActive)
   level: number // Add level property
-  hasPiercingShot: boolean // New property for piercing shot boost
   missileCount: number // New property for missile count
   lastMissileFireTime: number // New property for missile cooldown
+  skin: string // New property for player ship skin
+  canFireMissile: boolean // New property to control single missile fire per key press
 
-  constructor() {
+  constructor(x?: number, y?: number, skin: string = DEFAULT_SHIP_SKIN) {
     this.width = PLAYER_WIDTH
     this.height = PLAYER_HEIGHT
-    this.x = CANVAS_WIDTH / 2 - this.width / 2
-    this.y = CANVAS_HEIGHT - this.height - 20
+    this.x = x !== undefined ? x : CANVAS_WIDTH / 2 - this.width / 2
+    this.y = y !== undefined ? y : CANVAS_HEIGHT - this.height - 20
     this.baseSpeed = PLAYER_SPEED
     this.speed = this.baseSpeed
     this.isMovingLeft = false
     this.isMovingRight = false
     this.bullets = []
     this.lastFireTime = 0
-    this.hasDoubleShot = false // Initialize double shot to false
+    this.hasDoubleShot = false // Initialize temporary double shot to false
     this.isFiringHeld = false // Initialize isFiringHeld to false
     this.isInvincible = false // Initialize invincibility
-    this.maxBullets = 3 // Initial number of bullets
-    this.currentBullets = this.maxBullets // Set current bullets to max
+    this.baseShotCount = 1 // Initial number of bullets is 1
     this.level = 1 // Initialize level
-    this.hasPiercingShot = false // Initialize piercing shot to false
-    this.missileCount = MISSILE_INITIAL_COUNT // Initialize missile count
+    this.missileCount = MISSILE_INITIAL_COUNT // Initialize missile count using constant
     this.lastMissileFireTime = 0 // Initialize missile cooldown
+    this.skin = skin // Initialize skin
+    this.canFireMissile = true // Initialize to true, allows firing on first press
   }
 
   draw(ctx: CanvasRenderingContext2D) {
@@ -95,20 +122,154 @@ export class Player {
     ctx.save()
     ctx.translate(this.x + this.width / 2, this.y + this.height / 2) // Translate to center for easier drawing
 
+    let mainColor = 'lime'
+    let cockpitColor = 'cyan'
+    let engineColor = 'orange'
+    let outlineColor = 'white'
+
+    switch (this.skin) {
+      case 'red_baron':
+        mainColor = 'red'
+        cockpitColor = 'darkred'
+        engineColor = 'orange'
+        outlineColor = 'black'
+        break
+      case 'blue_streak':
+        mainColor = 'blue'
+        cockpitColor = 'lightblue'
+        engineColor = 'cyan'
+        outlineColor = 'white'
+        break
+      case 'gold_finger':
+        mainColor = 'gold'
+        cockpitColor = 'yellow'
+        engineColor = 'orange'
+        outlineColor = 'brown'
+        break
+      case 'dark_knight':
+        mainColor = 'darkgray'
+        cockpitColor = 'gray'
+        engineColor = 'purple'
+        outlineColor = 'black'
+        break
+      case 'space_ranger':
+        mainColor = 'green'
+        cockpitColor = 'lightgreen'
+        engineColor = 'lime'
+        outlineColor = 'darkgreen'
+        break
+      case 'purple_haze':
+        mainColor = 'purple'
+        cockpitColor = 'magenta'
+        engineColor = 'pink'
+        outlineColor = 'darkviolet'
+        break
+      case 'silver_surfer':
+        mainColor = 'silver'
+        cockpitColor = 'lightgray'
+        engineColor = 'white'
+        outlineColor = 'gray'
+        break
+      case 'toxic_avenger':
+        mainColor = 'darkgreen'
+        cockpitColor = 'lime'
+        engineColor = 'yellow'
+        outlineColor = 'black'
+        break
+      case 'phoenix':
+        mainColor = 'orange'
+        cockpitColor = 'red'
+        engineColor = 'gold'
+        outlineColor = 'darkorange'
+        break
+      case 'ice_queen':
+        mainColor = 'lightblue'
+        cockpitColor = 'white'
+        engineColor = 'cyan'
+        outlineColor = 'blue'
+        break
+      case 'lava_lord':
+        mainColor = 'darkred'
+        cockpitColor = 'orange'
+        engineColor = 'red'
+        outlineColor = 'black'
+        break
+      case 'emerald_dream':
+        mainColor = 'emerald'
+        cockpitColor = 'lightgreen'
+        engineColor = 'cyan'
+        outlineColor = 'darkgreen'
+        break
+      case 'ruby_star':
+        mainColor = 'crimson'
+        cockpitColor = 'red'
+        engineColor = 'pink'
+        outlineColor = 'darkred'
+        break
+      case 'sapphire_sky':
+        mainColor = 'darkblue'
+        cockpitColor = 'skyblue'
+        engineColor = 'blue'
+        outlineColor = 'navy'
+        break
+      case 'cosmic_comet':
+        mainColor = 'darkviolet'
+        cockpitColor = 'purple'
+        engineColor = 'magenta'
+        outlineColor = 'indigo'
+        break
+      case 'galaxy_guardian':
+        mainColor = 'teal'
+        cockpitColor = 'aquamarine'
+        engineColor = 'lime'
+        outlineColor = 'darkcyan'
+        break
+      case 'solar_flare':
+        mainColor = 'yellow'
+        cockpitColor = 'orange'
+        engineColor = 'red'
+        outlineColor = 'gold'
+        break
+      case 'nebula_navigator':
+        mainColor = 'indigo'
+        cockpitColor = 'violet'
+        engineColor = 'blue'
+        outlineColor = 'darkblue'
+        break
+      case 'quantum_quill':
+        mainColor = 'gray'
+        cockpitColor = 'silver'
+        engineColor = 'white'
+        outlineColor = 'darkgray'
+        break
+      case 'void_vanguard':
+        mainColor = 'black'
+        cockpitColor = 'darkgray'
+        engineColor = 'red'
+        outlineColor = 'white'
+        break
+      default: // Default skin
+        mainColor = 'lime'
+        cockpitColor = 'cyan'
+        engineColor = 'orange'
+        outlineColor = 'white'
+        break
+    }
+
     // Main body (triangular shape)
-    ctx.fillStyle = 'lime'
+    ctx.fillStyle = mainColor
     ctx.beginPath()
     ctx.moveTo(0, -this.height / 2) // Top point
     ctx.lineTo(this.width / 2, this.height / 2) // Bottom right
     ctx.lineTo(-this.width / 2, this.height / 2) // Bottom left
     ctx.closePath()
     ctx.fill()
-    ctx.strokeStyle = 'white'
+    ctx.strokeStyle = outlineColor
     ctx.lineWidth = 1
     ctx.stroke()
 
     // Cockpit
-    ctx.fillStyle = 'cyan'
+    ctx.fillStyle = cockpitColor
     ctx.beginPath()
     ctx.arc(0, -this.height / 4, this.width / 8, 0, Math.PI * 2)
     ctx.fill()
@@ -116,7 +277,7 @@ export class Player {
     ctx.stroke()
 
     // Engines (simple rectangles at the back)
-    ctx.fillStyle = 'orange'
+    ctx.fillStyle = engineColor
     ctx.fillRect(-this.width / 4, this.height / 2 - 5, this.width / 8, 10)
     ctx.fillRect(this.width / 8, this.height / 2 - 5, this.width / 8, 10)
 
@@ -130,7 +291,6 @@ export class Player {
     ctx.lineTo(this.width / 4, this.height / 2 + 5);
     ctx.closePath();
     ctx.fill();
-
 
     ctx.restore()
   }
@@ -157,66 +317,166 @@ export class Player {
   }
 
   fireBullet() {
-    let bulletsToFire = 1;
-    if (this.level >= 5) {
-      bulletsToFire = 3;
-    }
+    let bulletsToFire = this.baseShotCount; // Use baseShotCount for initial bullets
+
+    // Double Shot boost: adds 2 bullets on top of the current base
     if (this.hasDoubleShot) {
-      bulletsToFire = 5;
+      bulletsToFire += 2;
     }
 
+    // Determine if spread should be applied
+    const applySpread = bulletsToFire > 1;
+
+    // Calculate offsets for spread
+    const totalWidth = (bulletsToFire - 1) * (applySpread ? DOUBLE_SHOT_BULLET_OFFSET : 0);
+    const startXOffset = -totalWidth / 2;
+
     for (let i = 0; i < bulletsToFire; i++) {
-      let offsetX = 0;
-      if (bulletsToFire === 3) {
-        offsetX = (i - 1) * DOUBLE_SHOT_BULLET_OFFSET;
-      } else if (bulletsToFire === 5) {
-        offsetX = (i - 2) * (DOUBLE_SHOT_BULLET_OFFSET);
-      }
+      const offsetX = startXOffset + i * (applySpread ? DOUBLE_SHOT_BULLET_OFFSET : 0);
       this.bullets.push(
         new Bullet(
           this.x + this.width / 2 - BULLET_WIDTH / 2 + offsetX,
           this.y,
           -PLAYER_BULLET_SPEED,
           'player',
-          this.hasPiercingShot, // Pass piercing shot status
-          1, // Default damage for regular bullets
+          false, // Regular player bullets are NOT piercing
+          1,
         ),
       );
     }
   }
 
-  fireMissile() {
+  fireMissile(onMissileCountUpdate: (count: number) => void) {
     const now = Date.now()
-    if (this.missileCount > 0 && (now - this.lastMissileFireTime > MISSILE_FIRE_RATE_LIMIT)) {
-      this.bullets.push(
-        new Missile(
-          this.x + this.width / 2 - MISSILE_WIDTH / 2,
-          this.y,
-          -MISSILE_SPEED,
-          'player',
-          false, // Missiles are not piercing by default, can be changed
-          MISSILE_DAMAGE,
-        ),
-      )
-      this.missileCount--
-      this.lastMissileFireTime = now
-      console.log(`Missile fired! Remaining: ${this.missileCount}`)
-    } else if (this.missileCount === 0) {
-      console.log('No missiles left!')
-    } else {
-      console.log('Missile on cooldown.')
+    const timeSinceLastMissile = now - this.lastMissileFireTime;
+
+    console.log(`Player.ts: fireMissile called. Missile Count: ${this.missileCount}, canFireMissile: ${this.canFireMissile}, timeSinceLastMissile: ${timeSinceLastMissile}`);
+
+    if (this.missileCount <= 0) {
+      console.warn('Player.ts: Missile Fire Attempt: No missiles left!');
+      return;
     }
+    if (!this.canFireMissile) {
+      console.warn('Player.ts: Missile Fire Attempt: Key still held down, waiting for release.');
+      return;
+    }
+    if (timeSinceLastMissile < MISSILE_FIRE_RATE_LIMIT) {
+      console.warn(`Player.ts: Missile Fire Attempt: On cooldown. Time left: ${((MISSILE_FIRE_RATE_LIMIT - timeSinceLastMissile) / 1000).toFixed(2)}s`);
+      return;
+    }
+
+    // If all conditions pass, fire the missile
+    this.bullets.push(
+      new Missile(
+        this.x + this.width / 2 - MISSILE_WIDTH / 2,
+        this.y,
+        -MISSILE_SPEED,
+        'player',
+        MISSILE_DAMAGE,
+      ),
+    )
+    this.missileCount--
+    this.lastMissileFireTime = now
+    this.canFireMissile = false; // Set to false to prevent continuous firing until key is released
+    onMissileCountUpdate(this.missileCount) // Update missile count via callback
+    console.log(`Player.ts: Missile fired! Remaining: ${this.missileCount}`)
+  }
+}
+
+export class BotPlayer extends Player {
+  constructor(x: number, y: number) {
+    super(x, y);
+    // Bot specific properties, if any
+    this.speed = PLAYER_SPEED * 0.8; // Slightly slower than player
+    this.hasDoubleShot = true; // Bots always have double shot for effectiveness
+    this.isInvincible = true; // Bots are invincible
   }
 
-  // Method to increase the number of bullets
-  increaseBullets(amount: number) {
-    this.maxBullets = Math.min(5, this.maxBullets + amount); // Cap at 5
-    this.currentBullets = this.maxBullets; // Refill bullets
+  draw(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+    ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+
+    // Bot specific drawing (e.g., a different color or simpler shape)
+    ctx.fillStyle = 'gray'; // Bot color
+    ctx.beginPath();
+    ctx.moveTo(0, -this.height / 2); // Top point
+    ctx.lineTo(this.width / 2, this.height / 2); // Bottom right
+    ctx.lineTo(-this.width / 2, this.height / 2); // Bottom left
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'lightgray';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Bot "eye" or sensor
+    ctx.fillStyle = 'red';
+    ctx.beginPath();
+    ctx.arc(0, -this.height / 4, this.width / 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Simple thrust animation
+    const flameHeight = 3 + Math.random() * 3; // Flickering effect
+    ctx.fillStyle = `rgba(255, 100, 0, ${0.5 + Math.random() * 0.2})`; // Orange, flickering opacity
+    ctx.beginPath();
+    ctx.moveTo(-this.width / 4, this.height / 2 + 5);
+    ctx.lineTo(-this.width / 8, this.height / 2 + 5 + flameHeight);
+    ctx.lineTo(this.width / 8, this.height / 2 + 5 + flameHeight);
+    ctx.lineTo(this.width / 4, this.height / 2 + 5);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
   }
 
-  // Method to reset bullets at the start of a level
-  resetBullets() {
-    this.currentBullets = this.maxBullets;
+  update(invaders: Invader[]) {
+    // Bot AI: Find the closest invader and move towards it
+    let closestInvader: Invader | null = null;
+    let minDistance = Infinity;
+
+    for (const invader of invaders) {
+      if (invader.isAlive) {
+        const distance = Math.abs(this.x - invader.x);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestInvader = invader;
+        }
+      }
+    }
+
+    if (closestInvader) {
+      if (this.x < closestInvader.x - this.width / 4 && this.x < CANVAS_WIDTH - this.width) {
+        this.x += this.speed;
+      } else if (this.x > closestInvader.x + this.width / 4 && this.x > 0) {
+        this.x -= this.speed;
+      }
+
+      // Fire at a regular interval
+      const now = Date.now();
+      if (now - this.lastFireTime > PLAYER_FIRE_RATE_LIMIT * 1.5) { // Slightly slower fire rate than player
+        this.fireBullet();
+        this.lastFireTime = now;
+      }
+    } else {
+      // If no invaders, just move randomly or stay in place
+      if (Math.random() < 0.01) { // Small chance to change direction
+        this.isMovingLeft = Math.random() < 0.5;
+        this.isMovingRight = !this.isMovingLeft;
+      }
+      if (this.isMovingLeft && this.x > 0) {
+        this.x -= this.speed;
+      } else if (this.isMovingRight && this.x < CANVAS_WIDTH - this.width) {
+        this.x += this.speed;
+      } else {
+        this.isMovingLeft = false;
+        this.isMovingRight = false;
+      }
+    }
+
+    // Update bot's bullets
+    this.bullets.forEach((bullet) => bullet.update());
+    this.bullets = this.bullets.filter(
+      (bullet) => bullet.y > 0 && !bullet.isOffscreen,
+    );
   }
 }
 
@@ -232,9 +492,9 @@ export class Invader {
   isAlive: boolean
   health: number // New property for invader health
   maxHealth: number // To store original health for drawing
-  shape: 'square' | 'circle' | 'triangle' // New property for invader shape
+  shape: 'square' | 'circle' | 'triangle' | 'diamond' | 'star' // New property for invader shape
 
-  constructor(x: number, y: number, speed: number, fireRate: number, health: number = INVADER_BASE_HEALTH, shape: 'square' | 'circle' | 'triangle' = 'square') {
+  constructor(x: number, y: number, speed: number, fireRate: number, health: number = INVADER_BASE_HEALTH, shape: 'square' | 'circle' | 'triangle' | 'diamond' | 'star' = 'square') {
     this.x = x
     this.y = y
     this.width = INVADER_WIDTH
@@ -303,6 +563,30 @@ export class Invader {
         ctx.arc(this.width / 4, this.height / 4, this.width / 10, 0, Math.PI * 2)
         ctx.fill()
         break
+      case 'diamond': // New shape for Diving Invader
+        ctx.beginPath();
+        ctx.moveTo(0, -this.height / 2);
+        ctx.lineTo(this.width / 2, 0);
+        ctx.lineTo(0, this.height / 2);
+        ctx.lineTo(-this.width / 2, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        break;
+      case 'star': // New shape for Split Invader
+        ctx.beginPath();
+        const outerRadius = this.width / 2;
+        const innerRadius = outerRadius / 2;
+        const numPoints = 5;
+        for (let i = 0; i < numPoints * 2; i++) {
+          const radius = i % 2 === 0 ? outerRadius : innerRadius;
+          const angle = (Math.PI / numPoints) * i;
+          ctx.lineTo(radius * Math.sin(angle), -radius * Math.cos(angle));
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        break;
       default:
         ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height) // Default to square
         ctx.strokeRect(-this.width / 2, -this.height / 2, this.width, this.height)
@@ -358,39 +642,70 @@ export class Invader {
 }
 
 export class BossInvader extends Invader {
-  constructor(x: number, y: number) {
-    super(x, y, BOSS_SPEED, BOSS_FIRE_RATE, BOSS_HEALTH, 'square') // Boss is always 'square' for now
+  constructor(x: number, y: number, speed: number, fireRate: number, health: number) {
+    super(x, y, speed, fireRate, health, 'square') // Boss is always 'square' for now
     this.width = BOSS_WIDTH
     this.height = BOSS_HEIGHT
-    this.maxHealth = BOSS_HEALTH // Ensure maxHealth is set for drawing health bar
+    this.maxHealth = health // Ensure maxHealth is set for drawing health bar
   }
 
   draw(ctx: CanvasRenderingContext2D) {
     if (!this.isAlive) return
 
-    // Boss specific drawing
     ctx.save()
     ctx.translate(this.x + this.width / 2, this.y + this.height / 2)
 
-    // Main body
-    ctx.fillStyle = 'purple'
+    // Main body - large central structure
+    ctx.fillStyle = 'darkblue'
     ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height)
-    ctx.strokeStyle = 'magenta'
+    ctx.strokeStyle = 'cyan'
     ctx.lineWidth = 2
     ctx.strokeRect(-this.width / 2, -this.height / 2, this.width, this.height)
 
-    // Core/Eye
-    ctx.fillStyle = 'red'
+    // Top "cockpit" or command center
+    ctx.fillStyle = 'gray'
     ctx.beginPath()
-    ctx.arc(0, 0, this.width / 4, 0, Math.PI * 2)
+    ctx.moveTo(0, -this.height / 2)
+    ctx.lineTo(this.width / 4, -this.height / 2 + 15)
+    ctx.lineTo(-this.width / 4, -this.height / 2 + 15)
+    ctx.closePath()
     ctx.fill()
-    ctx.strokeStyle = 'yellow'
+    ctx.strokeStyle = 'white'
     ctx.stroke()
 
-    // Cannons
-    ctx.fillStyle = 'gray'
-    ctx.fillRect(-this.width / 2 + 5, this.height / 2 - 10, 10, 10)
-    ctx.fillRect(this.width / 2 - 15, this.height / 2 - 10, 10, 10)
+    // Glowing core
+    ctx.fillStyle = 'red'
+    ctx.beginPath()
+    ctx.arc(0, 0, this.width / 5, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = 'orange'
+    ctx.lineWidth = 1
+    ctx.stroke()
+
+    // Side wings/cannons
+    ctx.fillStyle = 'darkslategray'
+    ctx.beginPath()
+    ctx.moveTo(-this.width / 2, -this.height / 4)
+    ctx.lineTo(-this.width / 2 - 15, -this.height / 4 + 10)
+    ctx.lineTo(-this.width / 2 - 15, this.height / 4 - 10)
+    ctx.lineTo(-this.width / 2, this.height / 4)
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.moveTo(this.width / 2, -this.height / 4)
+    ctx.lineTo(this.width / 2 + 15, -this.height / 4 + 10)
+    ctx.lineTo(this.width / 2 + 15, this.height / 4 - 10)
+    ctx.lineTo(this.width / 2, this.height / 4)
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+
+    // Engine exhausts (bottom)
+    ctx.fillStyle = 'orange'
+    ctx.fillRect(-this.width / 3, this.height / 2 - 5, this.width / 6, 10)
+    ctx.fillRect(this.width / 6, this.height / 2 - 5, this.width / 6, 10)
 
     ctx.restore()
 
@@ -403,38 +718,27 @@ export class BossInvader extends Invader {
   }
 
   shoot() {
-    // Boss can shoot multiple bullets or a wider shot
-    this.bullets.push(
-      new Bullet(
-        this.x + this.width / 2 - BULLET_WIDTH / 2,
-        this.y + this.height,
-        BOSS_BULLET_SPEED,
-        'invader',
-        false,
-        1, // Default damage for boss bullets
-      ),
-    )
-    // Example: double shot for boss
-    this.bullets.push(
-      new Bullet(
-        this.x + this.width / 4 - BULLET_WIDTH / 2,
-        this.y + this.height,
-        BOSS_BULLET_SPEED,
-        'invader',
-        false,
-        1,
-      ),
-    )
-    this.bullets.push(
-      new Bullet(
-        this.x + this.width * 3 / 4 - BULLET_WIDTH / 2,
-        this.y + this.height,
-        BOSS_BULLET_SPEED,
-        'invader',
-        false,
-        1,
-      ),
-    )
+    // Boss fires 5 bullets in a spread pattern
+    const numBullets = 5;
+    const spreadAngle = Math.PI / 6; // Total spread angle
+    const startAngle = -spreadAngle / 2;
+
+    for (let i = 0; i < numBullets; i++) {
+      const angle = startAngle + (i / (numBullets - 1)) * spreadAngle;
+      const bulletSpeedX = BOSS_BULLET_SPEED * Math.sin(angle);
+      const bulletSpeedY = BOSS_BULLET_SPEED * Math.cos(angle);
+
+      this.bullets.push(
+        new BossBullet(
+          this.x + this.width / 2 - BULLET_WIDTH / 2,
+          this.y + this.height,
+          { x: bulletSpeedX, y: bulletSpeedY }, // Pass as object for custom bullet
+          'invader',
+          false,
+          BOSS_BULLET_DAMAGE,
+        ),
+      );
+    }
   }
 }
 
@@ -497,18 +801,276 @@ export class KamikazeInvader extends Invader {
   }
 }
 
+// New Diving Invader Class
+export class DivingInvader extends Invader {
+  damage: number
+  targetX: number
+
+  constructor(x: number, y: number, targetX: number) {
+    super(x, y, DIVING_INVADER_SPEED, 0, DIVING_INVADER_HEALTH, 'diamond') // Diving invader is a 'diamond'
+    this.width = DIVING_INVADER_WIDTH
+    this.height = DIVING_INVADER_HEIGHT
+    this.damage = DIVING_INVADER_DAMAGE
+    this.maxHealth = DIVING_INVADER_HEALTH
+    this.targetX = targetX // The X coordinate to dive towards
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    if (!this.isAlive) return
+
+    ctx.save()
+    ctx.translate(this.x + this.width / 2, this.y + this.height / 2)
+
+    // Diving Invader specific drawing (e.g., a fast, small, blue diamond)
+    ctx.fillStyle = 'deepskyblue'
+    ctx.beginPath()
+    ctx.moveTo(0, -this.height / 2)
+    ctx.lineTo(this.width / 2, 0)
+    ctx.lineTo(0, this.height / 2)
+    ctx.lineTo(-this.width / 2, 0)
+    ctx.closePath()
+    ctx.fill()
+    ctx.strokeStyle = 'white'
+    ctx.lineWidth = 1
+    ctx.stroke()
+
+    // Small eye/sensor
+    ctx.fillStyle = 'yellow'
+    ctx.beginPath()
+    ctx.arc(0, 0, this.width / 8, 0, Math.PI * 2)
+    ctx.fill()
+
+    ctx.restore()
+  }
+
+  update() {
+    if (!this.isAlive) return
+
+    // Move towards the targetX horizontally
+    if (this.x < this.targetX - this.speed) {
+      this.x += this.speed;
+    } else if (this.x > this.targetX + this.speed) {
+      this.x -= this.speed;
+    }
+
+    // Move straight down
+    this.y += this.speed;
+
+    if (this.y > CANVAS_HEIGHT) {
+      this.isAlive = false; // Remove if offscreen
+    }
+  }
+
+  // Diving invaders do not move horizontally with the wave or shoot
+  moveDown() { /* Do nothing */ }
+  shoot() { /* Do nothing */ }
+}
+
+// New Split Invader Class
+export class SplitInvader extends Invader {
+  constructor(x: number, y: number) {
+    super(x, y, SPLIT_INVADER_SPEED, SPLIT_INVADER_FIRE_RATE, SPLIT_INVADER_HEALTH, 'star');
+    this.width = SPLIT_INVADER_WIDTH;
+    this.height = SPLIT_INVADER_HEIGHT;
+    this.maxHealth = SPLIT_INVADER_HEALTH;
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    if (!this.isAlive) return;
+
+    ctx.save();
+    ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+
+    // Split Invader specific drawing (e.g., a green star)
+    ctx.fillStyle = 'green';
+    ctx.strokeStyle = 'lightgreen';
+    ctx.lineWidth = 1;
+
+    const outerRadius = this.width / 2;
+    const innerRadius = outerRadius / 2;
+    const numPoints = 5;
+
+    ctx.beginPath();
+    for (let i = 0; i < numPoints * 2; i++) {
+      const radius = i % 2 === 0 ? outerRadius : innerRadius;
+      const angle = (Math.PI / numPoints) * i;
+      ctx.lineTo(radius * Math.sin(angle), -radius * Math.cos(angle));
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Small core
+    ctx.fillStyle = 'darkgreen';
+    ctx.beginPath();
+    ctx.arc(0, 0, innerRadius / 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+
+    // Health bar for multi-hit invaders
+    if (this.maxHealth > 1) {
+      const healthBarWidth = this.width * (this.health / this.maxHealth);
+      ctx.fillStyle = 'lime';
+      ctx.fillRect(this.x, this.y - 5, healthBarWidth, 3);
+      ctx.strokeStyle = 'white';
+      ctx.strokeRect(this.x, this.y - 5, this.width, 3);
+    }
+  }
+
+  // Override hit to handle splitting logic
+  hit(damage: number = 1) {
+    this.health -= damage;
+    if (this.health <= 0) {
+      this.isAlive = false;
+      // The splitting logic will be handled in Game.ts checkCollisions
+    }
+  }
+}
+
+// New Mine-Laying Invader Class
+export class MineLayingInvader extends Invader {
+  lastMineDropTime: number;
+  mineDropRate: number;
+
+  constructor(x: number, y: number) {
+    super(x, y, MINE_LAYING_INVADER_SPEED, MINE_LAYING_INVADER_FIRE_RATE, MINE_LAYING_INVADER_HEALTH, 'square'); // Can be any shape
+    this.width = MINE_LAYING_INVADER_WIDTH;
+    this.height = MINE_LAYING_INVADER_HEIGHT;
+    this.maxHealth = MINE_LAYING_INVADER_HEALTH;
+    this.lastMineDropTime = 0;
+    this.mineDropRate = MINE_LAYING_INVADER_MINE_DROP_RATE;
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    if (!this.isAlive) return;
+
+    ctx.save();
+    ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+
+    // Mine-Laying Invader specific drawing (e.g., a bulky, dark invader)
+    ctx.fillStyle = 'darkslategray';
+    ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
+    ctx.strokeStyle = 'gray';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-this.width / 2, -this.height / 2, this.width, this.height);
+
+    // Mine dispenser
+    ctx.fillStyle = 'black';
+    ctx.fillRect(-this.width / 4, this.height / 2 - 5, this.width / 2, 10);
+    ctx.strokeStyle = 'darkgray';
+    ctx.strokeRect(-this.width / 4, this.height / 2 - 5, this.width / 2, 10);
+
+    // Warning light
+    ctx.fillStyle = 'red';
+    ctx.beginPath();
+    ctx.arc(0, -this.height / 4, this.width / 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+
+    // Health bar
+    if (this.maxHealth > 1) {
+      const healthBarWidth = this.width * (this.health / this.maxHealth);
+      ctx.fillStyle = 'lightgray';
+      ctx.fillRect(this.x, this.y - 5, healthBarWidth, 3);
+      ctx.strokeStyle = 'white';
+      ctx.strokeRect(this.x, this.y - 5, this.width, 3);
+    }
+  }
+
+  // Method to lay a mine (called by Game loop)
+  layMine(): Mine | null {
+    const now = Date.now();
+    // Only drop a mine if enough time has passed since the last drop, or if it's the first drop
+    if (now - this.lastMineDropTime > (1000 / this.mineDropRate)) { // Convert rate to interval
+      this.lastMineDropTime = now;
+      return new Mine(this.x + this.width / 2 - MINE_SIZE / 2, this.y + this.height);
+    }
+    return null;
+  }
+}
+
+// New Mine Class
+export class Mine {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  damage: number;
+  spawnTime: number;
+  isExploded: boolean;
+  isOffscreen: boolean;
+
+  constructor(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+    this.width = MINE_SIZE;
+    this.height = MINE_SIZE;
+    this.damage = MINE_DAMAGE;
+    this.spawnTime = Date.now();
+    this.isExploded = false;
+    this.isOffscreen = false;
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    if (this.isExploded || this.isOffscreen) return;
+
+    const age = Date.now() - this.spawnTime;
+    const opacity = 1 - (age / MINE_LIFETIME);
+
+    ctx.save();
+    ctx.globalAlpha = opacity;
+
+    // Mine body
+    ctx.fillStyle = 'darkgray';
+    ctx.beginPath();
+    ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Spikes
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(this.x + this.width / 2, this.y);
+    ctx.lineTo(this.x + this.width / 2, this.y - 5);
+    ctx.moveTo(this.x + this.width, this.y + this.height / 2);
+    ctx.lineTo(this.x + this.width + 5, this.y + this.height / 2);
+    ctx.moveTo(this.x + this.width / 2, this.y + this.height);
+    ctx.lineTo(this.x + this.width / 2, this.y + this.height + 5);
+    ctx.moveTo(this.x, this.y + this.height / 2);
+    ctx.lineTo(this.x - 5, this.y + this.height / 2);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  update() {
+    if (Date.now() - this.spawnTime > MINE_LIFETIME) {
+      this.isExploded = true; // Mine despawns after lifetime
+    }
+    if (this.y > CANVAS_HEIGHT) {
+      this.isOffscreen = true;
+    }
+  }
+}
+
+
 export class Bullet {
   x: number
   y: number
   width: number
   height: number
-  speed: number
-  type: 'player' | 'invader'
+  speed: number | { x: number; y: number } // Can be a number (vertical) or an object (directional)
+  type: 'player' | 'invader' | 'bot' // Added 'bot' type
   isOffscreen: boolean
   isPiercing: boolean // New property for piercing bullets
   damage: number // New property for bullet damage
 
-  constructor(x: number, y: number, speed: number, type: 'player' | 'invader', isPiercing: boolean = false, damage: number = 1) {
+  constructor(x: number, y: number, speed: number | { x: number; y: number }, type: 'player' | 'invader' | 'bot', isPiercing: boolean = false, damage: number = 1) {
     this.x = x
     this.y = y
     this.width = BULLET_WIDTH
@@ -521,21 +1083,45 @@ export class Bullet {
   }
 
   draw(ctx: CanvasRenderingContext2D) {
-    ctx.fillStyle = this.type === 'player' ? (this.isPiercing ? 'lime' : 'yellow') : 'orange' // Green for piercing
+    ctx.fillStyle = this.type === 'player' ? (this.isPiercing ? 'lime' : 'yellow') : (this.type === 'bot' ? 'lightgray' : 'orange') // Green for piercing, lightgray for bot
     ctx.fillRect(this.x, this.y, this.width, this.height)
   }
 
   update() {
-    this.y += this.speed
-    if (this.y < 0 || this.y > CANVAS_HEIGHT) {
+    if (typeof this.speed === 'number') {
+      this.y += this.speed
+    } else {
+      this.x += this.speed.x
+      this.y += this.speed.y
+    }
+
+    if (this.y < 0 || this.y > CANVAS_HEIGHT || this.x < -this.width || this.x > CANVAS_WIDTH) {
       this.isOffscreen = true
     }
   }
 }
 
+export class BossBullet extends Bullet {
+  constructor(x: number, y: number, speed: { x: number; y: number }, type: 'invader', isPiercing: boolean = false, damage: number = BOSS_BULLET_DAMAGE) {
+    super(x, y, speed, type, isPiercing, damage);
+    this.width = BULLET_WIDTH * 1.5; // Slightly larger
+    this.height = BULLET_HEIGHT * 1.5; // Slightly larger
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    ctx.fillStyle = 'red'; // Boss bullets are distinct red
+    ctx.beginPath();
+    ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'darkred';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
 export class Missile extends Bullet {
-  constructor(x: number, y: number, speed: number, type: 'player' | 'invader', isPiercing: boolean = false, damage: number = MISSILE_DAMAGE) {
-    super(x, y, speed, type, isPiercing, damage)
+  constructor(x: number, y: number, speed: number, type: 'player' | 'invader' | 'bot', damage: number = MISSILE_DAMAGE) {
+    super(x, y, speed, type, true, damage) // Missiles are always piercing
     this.width = MISSILE_WIDTH
     this.height = MISSILE_HEIGHT
   }
@@ -601,7 +1187,7 @@ export class Shield {
   }
 }
 
-export type BoostType = 'speed' | 'extraLife' | 'shieldRepair' | 'doubleShot' | 'scoreMultiplier' | 'piercingShot' // Added 'piercingShot'
+export type BoostType = 'speed' | 'extraLife' | 'shieldRepair' | 'doubleShot' | 'scoreMultiplier' | 'bootKill'
 
 export class Boost {
   x: number
@@ -651,9 +1237,9 @@ export class Boost {
         text = 'x2 Score'
         textColor = 'gold'
         break
-      case 'piercingShot':
-        text = 'Pierce'
-        textColor = 'lime'
+      case 'bootKill':
+        text = 'Bot' // Changed text to 'Bot'
+        textColor = 'yellow'
         break
     }
 

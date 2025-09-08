@@ -38,8 +38,8 @@ import {
   BOSS_HEALTH,
   BOSS_SPEED,
   BOSS_FIRE_RATE,
+  BOSS_BULLET_SPEED,
   BOSS_SCORE_VALUE,
-  PIERCING_SHOT_DURATION,
   MISSILE_BOSS_REWARD,
   KAMIKAZE_INVADER_WIDTH,
   KAMIKAZE_INVADER_HEIGHT,
@@ -47,6 +47,41 @@ import {
   KAMIKAZE_INVADER_HEALTH,
   KAMIKAZE_INVADER_DAMAGE,
   KAMIKAZE_SPAWN_CHANCE,
+  DIVING_INVADER_WIDTH, // Import for Diving Invader
+  DIVING_INVADER_HEIGHT, // Import for Diving InvADER
+  DIVING_INVADER_SPEED, // Import for Diving Invader
+  DIVING_INVADER_HEALTH, // Import for Diving Invader
+  DIVING_INVADER_DAMAGE, // Import for Diving Invader
+  DIVING_INVADER_SPAWN_CHANCE, // Import for Diving Invader spawn chance
+  BOOT_KILL_DURATION, // Import for Boot Kill Boost
+  PLAYER_HEIGHT, // Import player height for bot spawn position
+  MISSILE_INITIAL_COUNT, // Import MISSILE_INITIAL_COUNT
+  DEFAULT_SHIP_SKIN, // Import default ship skin
+  SPLIT_INVADER_SPAWN_CHANCE, // Import for Split Invader spawn chance
+  SPLIT_INVADER_WIDTH, // Import for Split Invader width
+  SPLIT_INVADER_HEIGHT, // Import for Split Invader height
+  SPLIT_INVADER_HEALTH, // Import for Split Invader health
+  SPLIT_INVADER_SPEED, // Import for Split Invader speed
+  SPLIT_INVADER_FIRE_RATE, // Import for Split Invader fire rate
+  SPLIT_INVADER_CHILD_COUNT, // Import for Split Invader child count
+  SPLIT_INVADER_CHILD_WIDTH, // Import for Split Invader child width
+  SPLIT_INVADER_CHILD_HEIGHT, // Import for Split Invader child height
+  SPLIT_INVADER_CHILD_HEALTH, // Import for Split Invader child health
+  SPLIT_INVADER_CHILD_SPEED, // Import for Split Invader child speed
+  SPLIT_INVADER_CHILD_FIRE_RATE, // Import for Split Invader child fire rate
+  MINE_LAYING_INVADER_SPAWN_CHANCE, // Import for Mine-Laying Invader spawn chance
+  MINE_LAYING_INVADER_WIDTH, // Import for Mine-Laying Invader width
+  MINE_LAYING_INVADER_HEIGHT, // Import for Mine-Laying Invader height
+  MINE_DAMAGE, // Import for Mine damage
+  UNPREDICTABLE_MOVE_CHANCE, // Import for unpredictable move chance
+  UNPREDICTABLE_MOVE_DOWN_CHANCE, // Import for unpredictable move down chance
+  INVADER_UNPREDICTABLE_SPEED_MULTIPLIER, // Import for invader unpredictable speed multiplier
+  INVADER_UNPREDICTABLE_FIRE_RATE_MULTIPLIER, // Import for invader unpredictable fire rate multiplier
+  INVADER_UNPREDICTABLE_HEALTH_MULTIPLIER, // Import for invader unpredictable health multiplier
+  KAMIKAZE_SPAWN_CHANCE_HIGH_LEVEL, // Import for high level Kamikaze spawn chance
+  DIVING_INVADER_SPAWN_CHANCE_HIGH_LEVEL, // Import for high level Diving Invader spawn chance
+  SPLIT_INVADER_SPAWN_CHANCE_HIGH_LEVEL, // Import for high level Split Invader spawn chance
+  MINE_LAYING_INVADER_SPAWN_CHANCE_HIGH_LEVEL, // Import for high level Mine-Laying Invader spawn chance
 } from './constants'
 
 import {
@@ -59,9 +94,15 @@ import {
   Explosion,
   BossInvader,
   KamikazeInvader,
+  Missile,
+  DivingInvader, // Import DivingInvader
+  BotPlayer, // Import BotPlayer
+  SplitInvader, // Import SplitInvader
+  MineLayingInvader, // Import MineLayingInvader
+  Mine, // Import Mine
 } from './entities'
 
-export type GameState = 'start' | 'playing' | 'gameOver' | 'won' | 'paused' | 'instructions' | 'levelComplete'
+export type GameState = 'start' | 'playing' | 'gameOver' | 'won' | 'paused' | 'instructions' | 'levelComplete' | 'about' | 'shipSkinSelection' | 'bossRush' | 'levelSelection' // Added 'bossRush' and 'levelSelection'
 
 interface GameCallbacks {
   onScoreUpdate: (score: number) => void
@@ -69,15 +110,18 @@ interface GameCallbacks {
   onGameStateChange: (state: GameState) => void
   onLevelUpdate: (level: number) => void
   onPlayerDeath?: (x: number, y: number) => void
+  onMissileCountUpdate: (count: number) => void // Added missile count update callback
 }
 
 export class Game {
   private ctx: CanvasRenderingContext2D
   public player: Player
+  public botPlayer: BotPlayer | null // New property for bot player
   private invaders: Invader[]
   private shields: Shield[]
   private boosts: Boost[]
   private explosions: Explosion[]
+  private mines: Mine[] // New property for mines
   private score: number
   private lives: number
   public gameState: GameState
@@ -93,20 +137,25 @@ export class Game {
   private currentScoreMultiplier: number
   private playerInvincibilityActive: boolean
   private playerInvincibilityTimeoutId: number | null
-  private playerPiercingShotBoostTimer: number | null
-  private playerPiercingShotBoostEndTime: number | null
+  private botPlayerActiveTimer: number | null // Timer for bot player duration
+  private botPlayerActiveEndTime: number | null // End time for bot player duration
   private activeBoosts: { type: BoostType; endTime: number }[]
   private levelBoosts: { [level: number]: BoostType }
   private hasWon: boolean
+  private selectedSkin: string // New property for selected skin
+  private isBossRushMode: boolean // New property for Boss Rush mode
 
-  constructor(ctx: CanvasRenderingContext2D, callbacks: GameCallbacks) {
+  constructor(ctx: CanvasRenderingContext2D, callbacks: GameCallbacks, selectedSkin: string = DEFAULT_SHIP_SKIN) {
     this.ctx = ctx
     this.callbacks = callbacks
-    this.player = new Player()
+    this.selectedSkin = selectedSkin // Initialize selected skin
+    this.player = new Player(undefined, undefined, this.selectedSkin) // Pass selected skin to Player
+    this.botPlayer = null // Initialize bot player
     this.invaders = []
     this.shields = []
     this.boosts = []
     this.explosions = []
+    this.mines = [] // Initialize mines
     this.score = 0
     this.lives = GAME_LIVES
     this.gameState = 'start'
@@ -121,20 +170,22 @@ export class Game {
     this.currentScoreMultiplier = 1
     this.playerInvincibilityActive = false
     this.playerInvincibilityTimeoutId = null
-    this.playerPiercingShotBoostTimer = null
-    this.playerPiercingShotBoostEndTime = null
+    this.botPlayerActiveTimer = null // Initialize bot player timer
+    this.botPlayerActiveEndTime = null // Initialize bot player end time
     this.activeBoosts = []
     this.levelBoosts = {
       2: 'speed',
       3: 'doubleShot',
     }
     this.hasWon = false
+    this.isBossRushMode = false // Initialize Boss Rush mode to false
 
     this.setupEventListeners()
     this.callbacks.onScoreUpdate(this.score)
     this.callbacks.onLivesUpdate(this.lives)
     this.callbacks.onGameStateChange(this.gameState)
     this.callbacks.onLevelUpdate(this.currentLevel)
+    this.callbacks.onMissileCountUpdate(this.player.missileCount) // Initial missile count update
   }
 
   private setupEventListeners() {
@@ -174,20 +225,28 @@ export class Game {
       e.preventDefault()
       this.player.isFiringHeld = true
     } else if (e.key.toLowerCase() === 'q') {
-      this.player.fireMissile()
+      e.preventDefault(); // Prevent default browser action for 'q' if any
+      console.log("Game.ts: Q key pressed. Attempting to fire missile."); // Added log
+      this.player.fireMissile(this.callbacks.onMissileCountUpdate) // Pass callback to update missile count
     }
   }
 
   private handleKeyUp = (e: KeyboardEvent) => {
-    if (this.gameState !== 'playing') return
-
+    // Always reset movement and firing flags, regardless of game state
+    // This prevents the player from getting stuck if a key is released while the game is paused or in another state.
     if (e.key === 'ArrowLeft') {
       this.player.isMovingLeft = false
     } else if (e.key === 'ArrowRight') {
       this.player.isMovingRight = false
     } else if (e.key === ' ') {
       this.player.isFiringHeld = false
+    } else if (e.key.toLowerCase() === 'q') { // Reset canFireMissile flag when 'Q' is released
+      this.player.canFireMissile = true;
+      console.log("Game.ts: Q key released. Missile can now be fired again."); // Added log
     }
+
+    // Only handle level complete click if in that state
+    if (this.gameState !== 'playing') return
   }
 
   private handleMouseDown = () => {
@@ -196,8 +255,30 @@ export class Game {
     }
   }
 
-  public startGame() {
+  public startGame(startLevel: number = 1) { // Modified to accept startLevel
     this.resetGame()
+    this.isBossRushMode = false // Ensure boss rush is off for regular game
+    this.currentLevel = startLevel; // Set the current level
+    this.callbacks.onLevelUpdate(this.currentLevel); // Update UI with new level
+    this.player.level = this.currentLevel; // Update player's level for level-based upgrades
+
+    // Set player's base shot count based on the starting level
+    if (this.currentLevel >= 4 && this.currentLevel <= 25) {
+      this.player.baseShotCount = 3; // 3 shots for levels 4-25
+    } else {
+      this.player.baseShotCount = 1; // Default 1 shot
+    }
+
+    this.gameState = 'playing'
+    this.callbacks.onGameStateChange(this.gameState)
+    this.spawnInvaders()
+    this.spawnShields()
+    this.loop()
+  }
+
+  public startBossRush() {
+    this.resetGame()
+    this.isBossRushMode = true
     this.gameState = 'playing'
     this.callbacks.onGameStateChange(this.gameState)
     this.loop()
@@ -222,44 +303,30 @@ export class Game {
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId)
     }
-    this.player = new Player()
+    // Create a new Player instance to reset all player properties, including level upgrades
+    this.player = new Player(undefined, undefined, this.selectedSkin)
+    this.botPlayer = null // Reset bot player
     this.invaders = []
     this.shields = []
     this.boosts = []
     this.explosions = []
+    this.mines = [] // Reset mines
     this.score = 0
     this.lives = GAME_LIVES
     this.gameState = 'start'
     this.animationFrameId = null
     this.invaderDirection = 1
-    this.currentLevel = 1
-    this.playerSpeedBoostTimer = null
-    this.playerSpeedBoostEndTime = null
-    this.playerDoubleShotBoostTimer = null
-    this.playerScoreMultiplierTimer = null
-    this.playerScoreMultiplierEndTime = null
-    this.currentScoreMultiplier = 1
-    this.player.speed = this.player.baseSpeed
-    this.player.hasDoubleShot = false
+    this.currentLevel = 1 // Reset to 1, will be overridden by startGame(startLevel) if called
     this.player.isFiringHeld = false
-    this.player.isInvincible = false
-    this.playerInvincibilityActive = false
-    if (this.playerInvincibilityTimeoutId) {
-      clearTimeout(this.playerInvincibilityTimeoutId)
-      this.playerInvincibilityTimeoutId = null
-    }
-    this.player.hasPiercingShot = false
-    if (this.playerPiercingShotBoostTimer) {
-      clearTimeout(this.playerPiercingShotBoostTimer)
-      this.playerPiercingShotBoostTimer = null
-      this.playerPiercingShotBoostEndTime = null
-    }
-    this.player.missileCount = 0
+    this.player.missileCount = MISSILE_INITIAL_COUNT // Reset missile count on game reset
     this.player.lastMissileFireTime = 0
-    this.activeBoosts = []
+    this.player.canFireMissile = true; // Reset canFireMissile on game reset
     this.hasWon = false
-    this.spawnInvaders()
-    this.spawnShields()
+    this.isBossRushMode = false // Reset boss rush mode
+
+    this.resetPlayerBoosts() // Centralized boost reset (only temporary boosts)
+
+    // Do not spawn invaders/shields here, let startGame handle it based on selected level
     this.score = 0
     this.lives = GAME_LIVES
     this.invaderDirection = 1
@@ -267,18 +334,79 @@ export class Game {
     this.callbacks.onLivesUpdate(this.lives)
     this.callbacks.onGameStateChange(this.gameState)
     this.callbacks.onLevelUpdate(this.currentLevel)
+    this.callbacks.onMissileCountUpdate(this.player.missileCount) // Reset missile count on game reset
+  }
+
+  public revivePlayer() {
+    // Stop any ongoing animation frame to prevent multiple loops
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+
+    // Reset player's position and state (new Player instance)
+    // This will also reset level-based upgrades, which might not be desired on revive.
+    // For now, we'll keep it simple and fully reset the player.
+    this.player = new Player(undefined, undefined, this.selectedSkin); // Pass selected skin on revive
+    this.player.missileCount = MISSILE_INITIAL_COUNT; // Ensure missiles are reset/given on revive
+    this.player.canFireMissile = true; // Reset canFireMissile on revive
+
+    // Re-apply level-based shot count
+    if (this.currentLevel >= 4 && this.currentLevel <= 25) {
+      this.player.baseShotCount = 3;
+    } else {
+      this.player.baseShotCount = 1;
+    }
+
+    // Clear all active boosts and their timers (temporary ones)
+    this.resetPlayerBoosts();
+
+    // Restore lives (e.g., to 1 for a revive)
+    this.lives = 1; // Assuming a revive gives 1 life back
+    this.callbacks.onLivesUpdate(this.lives);
+
+    // Activate temporary invincibility to prevent immediate re-death
+    this.activatePlayerInvincibility();
+
+    // Set game state back to playing
+    this.gameState = 'playing';
+    this.callbacks.onGameStateChange(this.gameState);
+
+    // Restart the game loop
+    this.loop();
   }
 
   private spawnInvaders() {
     this.invaders = []
 
-    if (this.currentLevel % BOSS_LEVEL_INTERVAL === 0) {
-      this.invaders.push(new BossInvader(CANVAS_WIDTH / 2 - BOSS_WIDTH / 2, INVADER_START_Y))
+    if (this.isBossRushMode || this.currentLevel % BOSS_LEVEL_INTERVAL === 0) {
+      // In Boss Rush mode, always spawn a boss.
+      // In regular mode, spawn a boss every BOSS_LEVEL_INTERVAL.
+      const bossHealthMultiplier = this.isBossRushMode ? (1 + (this.currentLevel - 1) * 0.5) : 1; // Bosses get tougher in Boss Rush
+      const bossSpeedMultiplier = this.isBossRushMode ? (1 + (this.currentLevel - 1) * 0.2) : 1;
+      const bossFireRateMultiplier = this.isBossRushMode ? (1 + (this.currentLevel - 1) * 0.1) : 1;
+
+      this.invaders.push(
+        new BossInvader(
+          CANVAS_WIDTH / 2 - BOSS_WIDTH / 2,
+          INVADER_START_Y,
+          BOSS_SPEED * bossSpeedMultiplier,
+          BOSS_FIRE_RATE * bossFireRateMultiplier,
+          BOSS_HEALTH * bossHealthMultiplier
+        )
+      );
     } else {
-      // Reduce the level multipliers for speed and fire rate
-      const levelInvaderSpeed = INVADER_SPEED * (1 + (this.currentLevel - 1) * (LEVEL_INVADER_SPEED_MULTIPLIER * 0.5));
-      const levelInvaderFireRate = INVADER_FIRE_RATE + (this.currentLevel - 1) * (LEVEL_INVADER_FIRE_RATE_MULTIPLIER * 0.5);
+      // Regular invader spawning logic
+      let levelInvaderSpeed = INVADER_SPEED * (1 + (this.currentLevel - 1) * (LEVEL_INVADER_SPEED_MULTIPLIER * 0.5));
+      let levelInvaderFireRate = INVADER_FIRE_RATE + (this.currentLevel - 1) * (LEVEL_INVADER_FIRE_RATE_MULTIPLIER * 0.5);
       let invaderHealth = INVADER_BASE_HEALTH + Math.floor((this.currentLevel - 1) / LEVEL_INVADER_HEALTH_INCREASE_INTERVAL)
+
+      // Apply advantages for levels 10-25
+      if (this.currentLevel >= 10 && this.currentLevel <= 25) {
+        levelInvaderSpeed *= INVADER_UNPREDICTABLE_SPEED_MULTIPLIER;
+        levelInvaderFireRate *= INVADER_UNPREDICTABLE_FIRE_RATE_MULTIPLIER;
+        invaderHealth = Math.ceil(invaderHealth * INVADER_UNPREDICTABLE_HEALTH_MULTIPLIER); // Ensure health is at least 1
+      }
 
       let currentInvaderRows = INVADER_ROWS
       let currentInvaderCols = INVADER_COLS
@@ -295,7 +423,7 @@ export class Game {
       const actualInvaderSpacingX = CANVAS_WIDTH / currentInvaderCols - INVADER_WIDTH / 2
       const actualInvaderSpacingY = INVADER_SPACING_Y
 
-      const invaderShapes: ('square' | 'circle' | 'triangle')[] = ['square', 'circle', 'triangle']
+      const invaderShapes: ('square' | 'circle' | 'triangle' | 'diamond' | 'star')[] = ['square', 'circle', 'triangle']
 
       for (let row = 0; row < currentInvaderRows; row++) {
         for (let col = 0; col < currentInvaderCols; col++) {
@@ -313,15 +441,50 @@ export class Game {
         }
       }
 
-      if (Math.random() < KAMIKAZE_SPAWN_CHANCE) {
+      // Adjust spawn chances for special invaders in levels 10-25
+      const currentKamikazeSpawnChance = (this.currentLevel >= 10 && this.currentLevel <= 25) ? KAMIKAZE_SPAWN_CHANCE_HIGH_LEVEL : KAMIKAZE_SPAWN_CHANCE;
+      const currentDivingInvaderSpawnChance = (this.currentLevel >= 10 && this.currentLevel <= 25) ? DIVING_INVADER_SPAWN_CHANCE_HIGH_LEVEL : DIVING_INVADER_SPAWN_CHANCE;
+      const currentSplitInvaderSpawnChance = (this.currentLevel >= 10 && this.currentLevel <= 25) ? SPLIT_INVADER_SPAWN_CHANCE_HIGH_LEVEL : SPLIT_INVADER_SPAWN_CHANCE;
+      const currentMineLayingInvaderSpawnChance = (this.currentLevel >= 10 && this.currentLevel <= 25) ? MINE_LAYING_INVADER_SPAWN_CHANCE_HIGH_LEVEL : MINE_LAYING_INVADER_SPAWN_CHANCE;
+
+
+      // Spawn Kamikaze Invader randomly
+      if (Math.random() < currentKamikazeSpawnChance) {
         const kamikazeX = Math.random() * (CANVAS_WIDTH - KAMIKAZE_INVADER_WIDTH)
         this.invaders.push(new KamikazeInvader(kamikazeX, INVADER_START_Y - KAMIKAZE_INVADER_HEIGHT))
         console.log('Kamikaze Invader spawned!')
+      }
+
+      // Spawn Diving Invader randomly
+      if (Math.random() < currentDivingInvaderSpawnChance) {
+        const spawnX = Math.random() * (CANVAS_WIDTH - DIVING_INVADER_WIDTH);
+        this.invaders.push(new DivingInvader(spawnX, -DIVING_INVADER_HEIGHT, this.player.x));
+        console.log('Diving Invader spawned!');
+      }
+
+      // Spawn Split Invader for levels 10-25
+      if (this.currentLevel >= 10 && this.currentLevel <= 25 && Math.random() < currentSplitInvaderSpawnChance) {
+        const splitX = Math.random() * (CANVAS_WIDTH - SPLIT_INVADER_WIDTH);
+        this.invaders.push(new SplitInvader(splitX, INVADER_START_Y - SPLIT_INVADER_HEIGHT));
+        console.log('Split Invader spawned!');
+      }
+
+      // Spawn Mine-Laying Invader for levels 10-25
+      if (this.currentLevel >= 10 && this.currentLevel <= 25 && Math.random() < currentMineLayingInvaderSpawnChance) {
+        const mineLayingX = Math.random() * (CANVAS_WIDTH - MINE_LAYING_INVADER_WIDTH);
+        this.invaders.push(new MineLayingInvader(mineLayingX, INVADER_START_Y - MINE_LAYING_INVADER_HEIGHT));
+        console.log('Mine-Laying Invader spawned!');
       }
     }
   }
 
   private spawnShields() {
+    // Shields are not spawned in Boss Rush mode for increased difficulty
+    if (this.isBossRushMode) {
+      this.shields = []; // Ensure no shields are present
+      return;
+    }
+
     if (this.shields.length === 0 || this.shields.every((s) => s.isDestroyed)) {
       const shieldSpacing = (CANVAS_WIDTH - NUMBER_OF_SHIELDS * SHIELD_WIDTH) / (NUMBER_OF_SHIELDS + 1)
       for (let i = 0; i < NUMBER_OF_SHIELDS; i++) {
@@ -333,10 +496,9 @@ export class Game {
   }
 
   private resetPlayerBoosts() {
-    // Reset player's boosts to default values
+    // Reset player's TEMPORARY boosts to default values
     this.player.speed = this.player.baseSpeed
-    this.player.hasDoubleShot = false
-    this.player.hasPiercingShot = false
+    this.player.hasDoubleShot = false // This is for the temporary boost
     this.player.isInvincible = false
 
     // Clear any active boost timers
@@ -361,11 +523,11 @@ export class Game {
       this.playerInvincibilityActive = false
       this.player.isInvincible = false
     }
-    if (this.playerPiercingShotBoostTimer) {
-      clearTimeout(this.playerPiercingShotBoostTimer)
-      this.playerPiercingShotBoostTimer = null
-      this.playerPiercingShotBoostEndTime = null
-      this.player.hasPiercingShot = false
+    if (this.botPlayerActiveTimer) { // Clear bot player timer
+      clearTimeout(this.botPlayerActiveTimer)
+      this.botPlayerActiveTimer = null
+      this.botPlayerActiveEndTime = null
+      this.botPlayer = null // Remove bot player
     }
     this.activeBoosts = []
   }
@@ -378,17 +540,27 @@ export class Game {
 
     this.currentLevel++
     this.callbacks.onLevelUpdate(this.currentLevel)
+    this.player.level = this.currentLevel; // Update player's level
 
-    // Clear entities, dropped boosts, and reset player boosts
+    // Set player's base shot count based on the new level
+    if (this.currentLevel >= 4 && this.currentLevel <= 25) {
+      this.player.baseShotCount = 3;
+    } else {
+      this.player.baseShotCount = 1;
+    }
+
+    // Clear entities, dropped boosts, and reset player temporary boosts
     this.clearEntities()
     this.clearDroppedBoosts()
-    this.resetPlayerBoosts()
+    this.resetPlayerBoosts() // Only resets temporary boosts, not level upgrades
 
+    // In Boss Rush mode, MAX_LEVELS can be effectively infinite or a very high number
+    // For now, we'll use MAX_LEVELS for both modes.
     if (this.currentLevel <= MAX_LEVELS) {
       this.gameState = 'playing'
       this.callbacks.onGameStateChange(this.gameState)
       this.spawnInvaders()
-      this.spawnShields()
+      this.spawnShields() // Shields will only spawn if not in Boss Rush mode
       this.invaderDirection = 1
       this.loop()
     } else {
@@ -399,8 +571,12 @@ export class Game {
   clearEntities() {
     this.invaders = []
     this.player.bullets = []
+    if (this.botPlayer) {
+      this.botPlayer.bullets = []
+    }
     this.boosts = []
     this.explosions = []
+    this.mines = [] // Clear mines
   }
 
   // دالة لمسح أي boosts نازلة من أعداء قدام
@@ -423,6 +599,9 @@ export class Game {
     if (this.gameState !== 'playing') return
 
     this.player.update()
+    if (this.botPlayer) {
+      this.botPlayer.update(this.invaders) // Pass invaders for bot AI
+    }
 
     const now = Date.now()
     this.activeBoosts = this.activeBoosts.filter((boost) => boost.endTime > now)
@@ -449,22 +628,52 @@ export class Game {
       }
     }
 
-    if (this.playerPiercingShotBoostTimer && this.playerPiercingShotBoostEndTime) {
-      if (now >= this.playerPiercingShotBoostEndTime) {
-        this.player.hasPiercingShot = false
-        this.playerPiercingShotBoostTimer = null
-        this.playerPiercingShotBoostEndTime = null
-        console.log('Player piercing shot boost ended.')
+    if (this.botPlayerActiveTimer && this.botPlayerActiveEndTime) {
+      if (now >= this.botPlayerActiveEndTime) {
+        this.botPlayer = null
+        this.botPlayerActiveTimer = null
+        this.botPlayerActiveEndTime = null;
+        console.log('Bot player boost ended.')
       }
+    }
+
+    // Spawn Diving Invader randomly (only in regular game mode)
+    // This is a per-frame chance, so it's very low.
+    if (!this.isBossRushMode && Math.random() < DIVING_INVADER_SPAWN_CHANCE) {
+      const spawnX = Math.random() * (CANVAS_WIDTH - DIVING_INVADER_WIDTH);
+      this.invaders.push(new DivingInvader(spawnX, -DIVING_INVADER_HEIGHT, this.player.x));
+      console.log('Diving Invader spawned!');
     }
 
     let hitEdge = false
     for (const invader of this.invaders) {
       if (!invader.isAlive) continue
 
-      if (invader instanceof KamikazeInvader) {
+      if (invader instanceof KamikazeInvader || invader instanceof DivingInvader) {
         invader.update()
         continue
+      }
+
+      if (invader instanceof MineLayingInvader) {
+        invader.update();
+        const mine = invader.layMine();
+        if (mine) {
+          this.mines.push(mine);
+          console.log('Mine laid by Mine-Laying Invader!');
+        }
+        continue;
+      }
+
+      // Unpredictable movement for regular invaders in levels 10-25
+      if (this.currentLevel >= 10 && this.currentLevel <= 25) {
+        // Randomly flip direction
+        if (Math.random() < UNPREDICTABLE_MOVE_CHANCE) {
+          this.invaderDirection *= -1;
+        }
+        // Randomly move down an extra amount
+        if (Math.random() < UNPREDICTABLE_MOVE_DOWN_CHANCE) {
+          invader.y += INVADER_MOVE_DOWN_AMOUNT / 2; // Move down half the usual amount
+        }
       }
 
       invader.direction = this.invaderDirection
@@ -482,7 +691,8 @@ export class Game {
     if (hitEdge) {
       this.invaderDirection *= -1
       for (const invader of this.invaders) {
-        if (invader.isAlive && !(invader instanceof KamikazeInvader)) {
+        // Only regular invaders, SplitInvaders, and MineLayingInvaders move down with the wave
+        if (invader.isAlive && !(invader instanceof KamikazeInvader) && !(invader instanceof DivingInvader)) {
           invader.moveDown()
         }
       }
@@ -494,13 +704,20 @@ export class Game {
     this.explosions.forEach((explosion) => explosion.update())
     this.explosions = this.explosions.filter((explosion) => explosion.isActive)
 
+    this.mines.forEach((mine) => mine.update());
+    this.mines = this.mines.filter((mine) => !mine.isExploded && !mine.isOffscreen);
+
     this.checkCollisions()
 
     this.invaders = this.invaders.filter((invader) => invader.isAlive)
     this.player.bullets = this.player.bullets.filter((bullet) => !bullet.isOffscreen)
+    if (this.botPlayer) {
+      this.botPlayer.bullets = this.botPlayer.bullets.filter((bullet) => !bullet.isOffscreen)
+    }
     this.shields = this.shields.filter((shield) => !shield.isDestroyed)
 
-    if (this.invaders.filter((inv) => !(inv instanceof KamikazeInvader)).length === 0) {
+    // Level completion check: only count regular invaders and BossInvaders
+    if (this.invaders.filter((inv) => inv instanceof Invader && !(inv instanceof KamikazeInvader) && !(inv instanceof DivingInvader) && !(inv instanceof SplitInvader) && !(inv instanceof MineLayingInvader)).length === 0) {
       if (this.currentLevel < MAX_LEVELS) {
         this.nextLevel()
       } else {
@@ -514,39 +731,161 @@ export class Game {
   }
 
   private checkCollisions() {
-    this.player.bullets.forEach((pBullet) => {
+    const allPlayerBullets: Bullet[] = [...this.player.bullets];
+    if (this.botPlayer) {
+      allPlayerBullets.push(...this.botPlayer.bullets);
+    }
+
+    const regularBullets: Bullet[] = [];
+    const missiles: Missile[] = [];
+
+    allPlayerBullets.forEach(bullet => {
+      if (bullet instanceof Missile) {
+        missiles.push(bullet);
+      } else {
+        regularBullets.push(bullet);
+      }
+    });
+
+    // --- Handle Regular Player/Bot Bullets ---
+    regularBullets.forEach((pBullet) => {
+      if (pBullet.isOffscreen) return;
+
       this.invaders.forEach((invader) => {
         if (invader.isAlive && this.checkCollision(pBullet, invader)) {
-          invader.hit(pBullet.damage)
-          if (!pBullet.isPiercing) {
-            pBullet.isOffscreen = true
+          invader.hit(pBullet.damage);
+          if (!pBullet.isPiercing) { // Regular bullets are not piercing, so they are removed
+            pBullet.isOffscreen = true;
           }
 
           if (!invader.isAlive) {
-            this.score += (invader instanceof BossInvader ? BOSS_SCORE_VALUE : SCORE_PER_INVADER) * this.currentScoreMultiplier
-            this.callbacks.onScoreUpdate(this.score)
+            this.score += (invader instanceof BossInvader ? BOSS_SCORE_VALUE : SCORE_PER_INVADER) * this.currentScoreMultiplier;
+            this.callbacks.onScoreUpdate(this.score);
 
             if (invader instanceof BossInvader) {
-              this.player.missileCount += MISSILE_BOSS_REWARD
-              console.log(`Boss destroyed! Player gained ${MISSILE_BOSS_REWARD} missiles. Total: ${this.player.missileCount}`)
+              this.player.missileCount += MISSILE_BOSS_REWARD;
+              this.callbacks.onMissileCountUpdate(this.player.missileCount);
+            } else if (invader instanceof SplitInvader) {
+              // Spawn child invaders when SplitInvader is destroyed
+              console.log('Split Invader destroyed! Spawning children...');
+              for (let i = 0; i < SPLIT_INVADER_CHILD_COUNT; i++) {
+                const childX = invader.x + (i * SPLIT_INVADER_CHILD_WIDTH * 1.5) - (SPLIT_INVADER_CHILD_COUNT * SPLIT_INVADER_CHILD_WIDTH * 0.75);
+                const childY = invader.y + invader.height + 5;
+                this.invaders.push(new Invader(
+                  childX,
+                  childY,
+                  SPLIT_INVADER_CHILD_SPEED,
+                  SPLIT_INVADER_CHILD_FIRE_RATE,
+                  SPLIT_INVADER_CHILD_HEALTH,
+                  'circle' // Child invaders are circles
+                ));
+              }
             }
 
             this.explosions.push(
-              new Explosion(invader.x + invader.width / 2, invader.y + invader.height / 2, EXPLOSION_INITIAL_SIZE, EXPLOSION_MAX_SIZE, EXPLOSION_MAX_FRAMES, EXPLOSION_COLOR),
-            )
+              new Explosion(invader.x + invader.width / 2, invader.y + invader.height / 2, EXPLOSION_INITIAL_SIZE, EXPLOSION_MAX_SIZE, EXPLOSION_MAX_FRAMES, EXPLOSION_COLOR)
+            );
 
+            // Boosts can drop from any invader
             if (Math.random() < BOOST_DROP_RATE) {
-              const boostTypes: BoostType[] = ['speed', 'extraLife', 'shieldRepair', 'doubleShot', 'scoreMultiplier', 'piercingShot']
-              const randomBoostType = boostTypes[Math.floor(Math.random() * boostTypes.length)]
-              this.boosts.push(new Boost(invader.x + invader.width / 2 - BOOST_SIZE / 2, invader.y + invader.height, randomBoostType))
-              console.log(`Invader dropped a ${randomBoostType}!`)
+              const boostTypes: BoostType[] = ['speed', 'extraLife', 'shieldRepair', 'doubleShot', 'scoreMultiplier', 'bootKill'];
+              const randomBoostType = boostTypes[Math.floor(Math.random() * boostTypes.length)];
+              this.boosts.push(new Boost(invader.x + invader.width / 2 - BOOST_SIZE / 2, invader.y + invader.height, randomBoostType));
             }
           }
         }
-      })
-    })
+      });
+    });
 
+    // --- Handle Player Missiles (now always piercing) ---
+    missiles.forEach((missile) => {
+      if (missile.isOffscreen) return;
+
+      let hitBossThisMissile = false; // Flag to ensure a missile only damages a specific boss once
+
+      // Iterate through invaders to check for collisions
+      for (const invader of this.invaders) {
+        if (!invader.isAlive || !this.checkCollision(missile, invader)) {
+          continue; // Skip if invader is dead or no collision
+        }
+
+        if (invader instanceof BossInvader) {
+          if (!hitBossThisMissile) { // Only hit this boss once per missile
+            const damageAmount = invader.maxHealth * 0.02; // 2% of max health
+            invader.hit(damageAmount);
+            hitBossThisMissile = true; // Mark boss as hit by this missile
+            console.log(`Missile hit Boss! Boss health: ${invader.health}`);
+
+            if (!invader.isAlive) {
+              this.score += BOSS_SCORE_VALUE * this.currentScoreMultiplier;
+              this.callbacks.onScoreUpdate(this.score);
+              this.player.missileCount += MISSILE_BOSS_REWARD;
+              this.callbacks.onMissileCountUpdate(this.player.missileCount);
+              this.explosions.push(
+                new Explosion(invader.x + invader.width / 2, invader.y + invader.height / 2, EXPLOSION_INITIAL_SIZE, EXPLOSION_MAX_SIZE, EXPLOSION_MAX_FRAMES, EXPLOSION_COLOR)
+              );
+            }
+          }
+        } else { // Regular invader, Kamikaze, Diving, Split, Mine-Laying
+          invader.hit(missile.damage); // Missiles deal MISSILE_DAMAGE to regular invaders
+          // Missiles are piercing, so they don't get set to isOffscreen=true here for regular hits
+          if (!invader.isAlive) {
+            this.score += SCORE_PER_INVADER * this.currentScoreMultiplier;
+            this.callbacks.onScoreUpdate(this.score);
+            this.explosions.push(
+              new Explosion(invader.x + invader.width / 2, invader.y + invader.height / 2, EXPLOSION_INITIAL_SIZE, EXPLOSION_MAX_SIZE, EXPLOSION_MAX_FRAMES, EXPLOSION_COLOR)
+            );
+            if (invader instanceof SplitInvader) {
+              console.log('Split Invader destroyed by missile! Spawning children...');
+              for (let i = 0; i < SPLIT_INVADER_CHILD_COUNT; i++) {
+                const childX = invader.x + (i * SPLIT_INVADER_CHILD_WIDTH * 1.5) - (SPLIT_INVADER_CHILD_COUNT * SPLIT_INVADER_CHILD_WIDTH * 0.75);
+                const childY = invader.y + invader.height + 5;
+                this.invaders.push(new Invader(
+                  childX,
+                  childY,
+                  SPLIT_INVADER_CHILD_SPEED,
+                  SPLIT_INVADER_CHILD_FIRE_RATE,
+                  SPLIT_INVADER_CHILD_HEALTH,
+                  'circle'
+                ));
+              }
+            }
+            if (Math.random() < BOOST_DROP_RATE) {
+              const boostTypes: BoostType[] = ['speed', 'extraLife', 'shieldRepair', 'doubleShot', 'scoreMultiplier', 'bootKill'];
+              const randomBoostType = boostTypes[Math.floor(Math.random() * boostTypes.length)];
+              this.boosts.push(new Boost(invader.x + invader.width / 2 - BOOST_SIZE / 2, invader.y + invader.height, randomBoostType));
+            }
+          }
+        }
+      }
+      // Missiles are only removed when they go off-screen, not based on hits.
+    });
+
+    // Reconstruct player.bullets and botPlayer.bullets arrays with updated states
+    this.player.bullets = allPlayerBullets.filter(b => b.type === 'player' && !b.isOffscreen);
+    if (this.botPlayer) {
+      this.botPlayer.bullets = allPlayerBullets.filter(b => b.type === 'bot' && !b.isOffscreen);
+    }
+
+
+    // --- Handle Invader Bullets and Kamikaze/Diving Invaders ---
     this.invaders.forEach((invader) => {
+      // Player-Invader collision with Bot Player (if active)
+      if (this.botPlayer && invader.isAlive && this.checkCollision(invader, this.player)) {
+        // If bot player is active, the main player is effectively "boot-killed" and doesn't take damage from collision
+        // The invader is destroyed by the bot's presence (conceptual "boot kill")
+        invader.hit(invader.health); // Instantly destroy invader
+        if (!invader.isAlive) {
+          this.score += (invader instanceof BossInvader ? BOSS_SCORE_VALUE : SCORE_PER_INVADER) * this.currentScoreMultiplier;
+          this.callbacks.onScoreUpdate(this.score);
+          this.explosions.push(
+            new Explosion(invader.x + invader.width / 2, invader.y + invader.height / 2, EXPLOSION_INITIAL_SIZE, EXPLOSION_MAX_SIZE, EXPLOSION_MAX_FRAMES, EXPLOSION_COLOR)
+          );
+        }
+        return; // Invader is destroyed, no further collision checks for this invader
+      }
+
+
       if (invader instanceof KamikazeInvader && invader.isAlive && this.checkCollision(invader, this.player)) {
         invader.isAlive = false
         this.explosions.push(
@@ -560,6 +899,24 @@ export class Game {
             this.callbacks.onPlayerDeath?.(this.player.x, this.player.y)
           } else {
             this.activatePlayerInvincibility()
+          }
+        }
+      }
+
+      // Handle DivingInvader collision with player
+      if (invader instanceof DivingInvader && invader.isAlive && this.checkCollision(invader, this.player)) {
+        invader.isAlive = false; // Destroy diving invader on impact
+        this.explosions.push(
+          new Explosion(invader.x + invader.width / 2, invader.y + invader.height / 2, EXPLOSION_INITIAL_SIZE, EXPLOSION_MAX_SIZE, EXPLOSION_MAX_FRAMES, EXPLOSION_COLOR),
+        );
+        if (!this.playerInvincibilityActive) {
+          this.lives -= invader.damage; // Diving invader deals damage
+          this.callbacks.onLivesUpdate(this.lives);
+          if (this.lives <= 0) {
+            this.endGame('gameOver');
+            this.callbacks.onPlayerDeath?.(this.player.x, this.player.y);
+          } else {
+            this.activatePlayerInvincibility();
           }
         }
       }
@@ -588,12 +945,45 @@ export class Game {
       })
     })
 
+    // --- Handle Boost Collisions ---
     this.boosts.forEach((boost) => {
       if (!boost.isCollected && this.checkCollision(this.player, boost)) {
         boost.isCollected = true
         this.applyBoostEffect(boost.type)
       }
     })
+
+    // --- Handle Mine Collisions ---
+    this.mines.forEach((mine) => {
+      if (!mine.isExploded && this.checkCollision(this.player, mine)) {
+        mine.isExploded = true;
+        this.explosions.push(
+          new Explosion(mine.x + mine.width / 2, mine.y + mine.height / 2, EXPLOSION_INITIAL_SIZE, EXPLOSION_MAX_SIZE, EXPLOSION_MAX_FRAMES, EXPLOSION_COLOR)
+        );
+        if (!this.playerInvincibilityActive) {
+          this.lives -= MINE_DAMAGE;
+          this.callbacks.onLivesUpdate(this.lives);
+          if (this.lives <= 0) {
+            this.endGame('gameOver');
+            this.callbacks.onPlayerDeath?.(this.player.x, this.player.y);
+          } else {
+            this.activatePlayerInvincibility();
+          }
+        }
+      }
+      // Optional: Invader bullets can destroy mines
+      this.invaders.forEach(invader => {
+        invader.bullets.forEach(iBullet => {
+          if (!mine.isExploded && !iBullet.isOffscreen && this.checkCollision(iBullet, mine)) {
+            mine.isExploded = true;
+            iBullet.isOffscreen = true;
+            this.explosions.push(
+              new Explosion(mine.x + mine.width / 2, mine.y + mine.height / 2, EXPLOSION_INITIAL_SIZE, EXPLOSION_MAX_SIZE, EXPLOSION_MAX_FRAMES, EXPLOSION_COLOR)
+            );
+          }
+        });
+      });
+    });
   }
 
   private activatePlayerInvincibility() {
@@ -604,7 +994,7 @@ export class Game {
       this.player.isInvincible = false
       this.playerInvincibilityTimeoutId = null
       console.log('Player invincibility ended.')
-    }, PLAYER_INVINCIBILITY_DURATION)
+    }, PLAYER_INVINCIBILITY_DURATION) as unknown as number // Cast to number
     console.log('Player hit! Invincibility activated.')
   }
 
@@ -637,14 +1027,19 @@ export class Game {
         console.log('Extra life gained!')
         break
       case 'shieldRepair':
-        this.spawnShields()
-        console.log('Shields rebuilt!')
+        // Only repair shields if not in Boss Rush mode
+        if (!this.isBossRushMode) {
+          this.spawnShields()
+          console.log('Shields rebuilt!')
+        } else {
+          console.log('Shield repair boost ignored in Boss Rush mode.')
+        }
         break
       case 'doubleShot':
         if (this.playerDoubleShotBoostTimer) {
           clearTimeout(this.playerDoubleShotBoostTimer)
         }
-        this.player.hasDoubleShot = true
+        this.player.hasDoubleShot = true // This is for the temporary boost
         this.playerDoubleShotBoostTimer = setTimeout(() => {
           this.player.hasDoubleShot = false
           this.playerDoubleShotBoostTimer = null
@@ -668,21 +1063,22 @@ export class Game {
         this.activeBoosts.push({ type, endTime })
         console.log(`Score multiplier activated! x${SCORE_MULTIPLIER_VALUE}`)
         break
-      case 'piercingShot':
-        if (this.playerPiercingShotBoostTimer) {
-          clearTimeout(this.playerPiercingShotBoostTimer)
+      case 'bootKill':
+        if (this.botPlayerActiveTimer) {
+          clearTimeout(this.botPlayerActiveTimer)
         }
-        this.player.hasPiercingShot = true
-        endTime = now + PIERCING_SHOT_DURATION
-        this.playerPiercingShotBoostTimer = setTimeout(() => {
-          this.player.hasPiercingShot = false
-          this.playerPiercingShotBoostTimer = null
-          this.playerPiercingShotBoostEndTime = null
-          console.log('Player piercing shot boost ended.')
-        }, PIERCING_SHOT_DURATION) as unknown as number
-        this.playerPiercingShotBoostEndTime = endTime
-        this.activeBoosts.push({ type, endTime })
-        console.log('Player piercing shot activated!')
+        // Spawn bot player slightly above the main player
+        this.botPlayer = new BotPlayer(this.player.x, this.player.y - PLAYER_HEIGHT);
+        endTime = now + BOOT_KILL_DURATION;
+        this.botPlayerActiveTimer = setTimeout(() => {
+          this.botPlayer = null;
+          this.botPlayerActiveTimer = null;
+          this.botPlayerActiveEndTime = null;
+          console.log('Bot player boost ended.');
+        }, BOOT_KILL_DURATION) as unknown as number;
+        this.botPlayerActiveEndTime = endTime;
+        this.activeBoosts.push({ type, endTime });
+        console.log('Bot player activated!');
         break
     }
   }
@@ -691,6 +1087,13 @@ export class Game {
     const now = Date.now()
     let displayX = 10
     const displayY = CANVAS_HEIGHT - 30
+
+    this.ctx.fillStyle = 'white'
+    this.ctx.font = '16px Arial'
+    this.ctx.textAlign = 'left'
+   // this.ctx.fillText(`Missiles: ${this.player.missileCount}`, displayX, displayY - 20); // Display missile count
+    displayX += this.ctx.measureText(`Missiles: ${this.player.missileCount}`).width + 15;
+
 
     this.activeBoosts.forEach((boost) => {
       const timeLeft = Math.max(0, Math.ceil((boost.endTime - now) / 1000))
@@ -711,9 +1114,9 @@ export class Game {
           icon = '💰'
           color = 'gold'
           break
-        case 'piercingShot':
-          icon = '🌌'
-          color = 'lime'
+        case 'bootKill':
+          icon = '🤖' // Bot emoji
+          color = 'yellow'
           break
         default:
           return
@@ -734,11 +1137,11 @@ export class Game {
     this.ctx.fillStyle = 'white'
     this.ctx.font = '48px Arial'
     this.ctx.textAlign = 'center'
-    this.ctx.fillText('', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 40)
+    this.ctx.fillText(`Level ${this.currentLevel} Complete!`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 40)
 
     this.ctx.font = '24px Arial'
     this.ctx.textAlign = 'center'
-    this.ctx.fillText('', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20)
+    this.ctx.fillText('Click to continue to the next level', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20)
   }
 
   private draw() {
@@ -746,6 +1149,11 @@ export class Game {
 
     this.player.draw(this.ctx)
     this.player.bullets.forEach((bullet) => bullet.draw(this.ctx))
+
+    if (this.botPlayer) {
+      this.botPlayer.draw(this.ctx)
+      this.botPlayer.bullets.forEach((bullet) => bullet.draw(this.ctx))
+    }
 
     this.invaders.forEach((invader) => {
       invader.draw(this.ctx)
@@ -759,6 +1167,10 @@ export class Game {
     this.boosts.forEach((boost) => {
       boost.draw(this.ctx)
     })
+
+    this.mines.forEach((mine) => { // Draw mines
+      mine.draw(this.ctx);
+    });
 
     this.explosions.forEach((explosion) => explosion.draw(this.ctx))
 
@@ -789,46 +1201,17 @@ export class Game {
     if (state === 'won' && !this.hasWon) {
       this.callbacks.onGameStateChange(this.gameState)
       this.hasWon = true
+    } else if (state === 'gameOver') {
+      this.callbacks.onGameStateChange(this.gameState)
     }
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId)
       this.animationFrameId = null
     }
 
-    if (this.playerSpeedBoostTimer) {
-      clearTimeout(this.playerSpeedBoostTimer)
-      this.playerSpeedBoostTimer = null
-      this.playerSpeedBoostEndTime = null
-    }
-
-    if (this.playerDoubleShotBoostTimer) {
-      clearTimeout(this.playerDoubleShotBoostTimer)
-      this.playerDoubleShotBoostTimer = null
-    }
-
-    if (this.playerScoreMultiplierTimer) {
-      clearTimeout(this.playerScoreMultiplierTimer)
-      this.playerScoreMultiplierTimer = null
-      this.playerScoreMultiplierEndTime = null
-      this.currentScoreMultiplier = 1
-    }
-
-    if (this.playerInvincibilityTimeoutId) {
-      clearTimeout(this.playerInvincibilityTimeoutId)
-      this.playerInvincibilityTimeoutId = null
-      this.playerInvincibilityActive = false
-      this.player.isInvincible = false
-    }
-
-    if (this.playerPiercingShotBoostTimer) {
-      clearTimeout(this.playerPiercingShotBoostTimer)
-      this.playerPiercingShotBoostTimer = null
-      this.playerPiercingShotBoostEndTime = null
-      this.player.hasPiercingShot = false
-    }
+    this.resetPlayerBoosts() // Centralized boost reset (only temporary boosts)
 
     this.player.isFiringHeld = false
-    this.activeBoosts = []
   }
 
   public destroy() {
@@ -839,24 +1222,20 @@ export class Game {
     }
     if (this.playerSpeedBoostTimer) {
       clearTimeout(this.playerSpeedBoostTimer)
-      this.playerSpeedBoostTimer = null
     }
     if (this.playerDoubleShotBoostTimer) {
       clearTimeout(this.playerDoubleShotBoostTimer)
-      this.playerDoubleShotBoostTimer = null
     }
     if (this.playerScoreMultiplierTimer) {
       clearTimeout(this.playerScoreMultiplierTimer)
-      this.playerScoreMultiplierTimer = null
     }
     if (this.playerInvincibilityTimeoutId) {
       clearTimeout(this.playerInvincibilityTimeoutId)
-      this.playerInvincibilityTimeoutId = null
     }
-    if (this.playerPiercingShotBoostTimer) {
-      clearTimeout(this.playerPiercingShotBoostTimer)
-      this.playerPiercingShotBoostTimer = null
-      this.playerPiercingShotBoostEndTime = null
+    if (this.botPlayerActiveTimer) { // Clear bot player timer
+      clearTimeout(this.botPlayerActiveTimer)
+      this.botPlayerActiveTimer = null
+      this.botPlayerActiveEndTime = null
     }
   }
 }
