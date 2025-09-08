@@ -82,6 +82,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   // State for zoom level
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // States for button presses
+  const [moveLeftActive, setMoveLeftActive] = useState(false);
+  const [moveRightActive, setMoveRightActive] = useState(false);
+  const [fireActive, setFireActive] = useState(false);
+  const [missileActive, setMissileActive] = useState(false);
+
   useEffect(() => {
     localStorage.setItem('selectedShipSkin', selectedSkin)
   }, [selectedSkin])
@@ -265,7 +271,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     console.log('GameCanvas: playerDeathPosition state:', playerDeathPosition); // Added log
   }, [gameState, showHighScoreInput, newHighScoreScore, playerDeathPosition]); // Added playerDeathPosition to dependencies
 
-
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -337,6 +342,57 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     return `Current: ${effect}`;
   };
 
+  // Button press handlers
+  const handleMoveLeftStart = () => {
+    setMoveLeftActive(true);
+    if (gameRef.current && gameRef.current.player) {
+      gameRef.current.player.isMovingLeft = true;
+    }
+  };
+
+  const handleMoveLeftEnd = () => {
+    setMoveLeftActive(false);
+    if (gameRef.current && gameRef.current.player) {
+      gameRef.current.player.isMovingLeft = false;
+    }
+  };
+
+  const handleMoveRightStart = () => {
+    setMoveRightActive(true);
+    if (gameRef.current && gameRef.current.player) {
+      gameRef.current.player.isMovingRight = true;
+    }
+  };
+
+  const handleMoveRightEnd = () => {
+    setMoveRightActive(false);
+    if (gameRef.current && gameRef.current.player) {
+      gameRef.current.player.isMovingRight = false;
+    }
+  };
+
+  const handleFireStart = () => {
+    setFireActive(true);
+    if (gameRef.current && gameRef.current.player) {
+      gameRef.current.player.isFiringHeld = true;
+    }
+  };
+
+  const handleFireEnd = () => {
+    setFireActive(false);
+    if (gameRef.current && gameRef.current.player) {
+      gameRef.current.player.isFiringHeld = false;
+    }
+  };
+
+  const handleMissileStart = () => {
+    setMissileActive(true);
+    gameRef.current?.player.fireMissile(onMissileCountUpdate);
+  };
+
+  const handleMissileEnd = () => {
+    setMissileActive(false);
+  };
 
   return (
     <div className="relative bg-gray-900 rounded-lg shadow-lg overflow-hidden">
@@ -615,7 +671,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
                         }
                       `}
                     >
-                      {playerUpgrades.maxLives >= MAX_UPGRADE_LEVELS.maxLives ? 'MAXED' : 'Upgrade'}
+                      {playerUpgrades.maxLives >= MAX_UPGRADE_LEVELS.maxLives ? 'MAXED' :'Upgrade'}
                     </button>
                   </div>
 
@@ -828,6 +884,56 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
             <Maximize size={24} />
           </button>
         </div>
+      )}
+
+      {/* Transparent control buttons */}
+      {gameState === 'playing' && (
+        <>
+          <button
+            className="absolute bottom-4 left-4 bg-gray-700 bg-opacity-50 hover:bg-opacity-75 text-white rounded-full w-16 h-16 flex items-center justify-center"
+            onTouchStart={handleMoveLeftStart}
+            onTouchEnd={handleMoveLeftEnd}
+            onMouseDown={handleMoveLeftStart}
+            onMouseUp={handleMoveLeftEnd}
+            onMouseLeave={handleMoveLeftEnd}
+            title="Move Left"
+          >
+            <ArrowLeft size={36} />
+          </button>
+          <button
+            className="absolute bottom-4 right-4 bg-gray-700 bg-opacity-50 hover:bg-opacity-75 text-white rounded-full w-16 h-16 flex items-center justify-center"
+            onTouchStart={handleMoveRightStart}
+            onTouchEnd={handleMoveRightEnd}
+            onMouseDown={handleMoveRightStart}
+            onMouseUp={handleMoveRightEnd}
+            onMouseLeave={handleMoveRightEnd}
+            title="Move Right"
+          >
+            <ArrowLeft size={36} style={{ transform: 'rotate(180deg)' }} />
+          </button>
+          <button
+            className="absolute bottom-4 left-24 bg-gray-700 bg-opacity-50 hover:bg-opacity-75 text-white rounded-full w-16 h-16 flex items-center justify-center"
+            onTouchStart={handleFireStart}
+            onTouchEnd={handleFireEnd}
+            onMouseDown={handleFireStart}
+            onMouseUp={handleFireEnd}
+            onMouseLeave={handleFireEnd}
+            title="Fire"
+          >
+            Fire
+          </button>
+          <button
+            className="absolute bottom-4 left-44 bg-gray-700 bg-opacity-50 hover:bg-opacity-75 text-white rounded-full w-16 h-16 flex items-center justify-center"
+            onTouchStart={handleMissileStart}
+            onTouchEnd={handleMissileEnd}
+            onMouseDown={handleMissileStart}
+            onMouseUp={handleMissileEnd}
+            onMouseLeave={handleMissileEnd}
+            title="Fire Missile"
+          >
+            Missile
+          </button>
+        </>
       )}
     </div>
   )
