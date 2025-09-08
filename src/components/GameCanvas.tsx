@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
-import { Game, GameState } from '../game/game'
-import { CANVAS_HEIGHT, CANVAS_WIDTH, GAME_LIVES, DEFAULT_SHIP_SKIN, MAX_LEVELS } from '../game/constants' // Import MAX_LEVELS
-import { Play, RefreshCw, Pause, Info, User, Rocket, LogOut, Palette, ListOrdered } from 'lucide-react' // Import ListOrdered icon
+import { Game, GameState, PlayerUpgrades, HighScore, UpgradeType } from '../game/game'
+import { CANVAS_HEIGHT, CANVAS_WIDTH, GAME_LIVES, DEFAULT_SHIP_SKIN, MAX_LEVELS, UPGRADE_COSTS, MAX_UPGRADE_LEVELS, UPGRADE_EFFECTS } from '../game/constants' // Import MAX_LEVELS
+import { Play, RefreshCw, Pause, Info, User, Rocket, LogOut, Palette, ListOrdered, DollarSign, Trophy, ArrowLeft } from 'lucide-react' // Import ListOrdered icon
 import Starfield from './Starfield' // Import Starfield component
 import ShipPreviewCanvas from './ShipPreviewCanvas' // Import ShipPreviewCanvas
 
@@ -69,6 +69,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   // State for selected level in the level selection screen
   const [selectedLevel, setSelectedLevel] = useState<number>(1);
 
+  // New states for permanent upgrades and leaderboard
+  const [playerCurrency, setPlayerCurrency] = useState<number>(0);
+  const [playerUpgrades, setPlayerUpgrades] = useState<PlayerUpgrades>({ fireRate: 0, maxLives: 0, shieldHealth: 0 });
+  const [highScores, setHighScores] = useState<HighScore[]>([]);
+
+  // New states for on-screen high score input
+  const [showHighScoreInput, setShowHighScoreInput] = useState<boolean>(false);
+  const [newHighScoreScore, setNewHighScoreScore] = useState<number | null>(null);
+  const [playerNameInput, setPlayerNameInput] = useState<string>('');
+
   useEffect(() => {
     localStorage.setItem('selectedShipSkin', selectedSkin)
   }, [selectedSkin])
@@ -121,6 +131,28 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     onGameStateChange('start');
   }, [onGameStateChange]);
 
+  const showUpgrades = useCallback(() => {
+    onGameStateChange('upgrades');
+  }, [onGameStateChange]);
+
+  const hideUpgrades = useCallback(() => {
+    onGameStateChange('start');
+  }, [onGameStateChange]);
+
+  const showLeaderboard = useCallback(() => {
+    onGameStateChange('leaderboard');
+  }, [onGameStateChange]);
+
+  const hideLeaderboard = useCallback(() => {
+    onGameStateChange('start');
+  }, [onGameStateChange]);
+
+  const handleBuyUpgrade = useCallback((type: UpgradeType) => {
+    if (gameRef.current) {
+      gameRef.current.buyUpgrade(type);
+    }
+  }, []);
+
   // Modified to handle level selection via box click
   const handleLevelSelect = useCallback((levelNum: number) => {
     setSelectedLevel(levelNum);
@@ -141,8 +173,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     if (gameRef.current && playerDeathPosition) {
       gameRef.current.player.x = playerDeathPosition.x;
       gameRef.current.player.y = playerDeathPosition.y;
-      gameRef.current.lives = GAME_LIVES;
-      onLivesUpdate(GAME_LIVES);
+      gameRef.current.lives = GAME_LIVES; // This will be overridden by permanent lives in resetGame/applyPermanentUpgrades
+      onLivesUpdate(GAME_LIVES); // This will be overridden
       gameRef.current.gameState = 'playing';
       onGameStateChange('playing');
       setPlayerDeathPosition(null);
@@ -173,13 +205,52 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       const popupInterval = setInterval(() => {
         if (popupWindow.closed) {
           clearInterval(popupInterval);
+          // Clear high score input state if it was active
+          setShowHighScoreInput(false);
+          setNewHighScoreScore(null);
+          setPlayerNameInput('');
           revivePlayer();
         }
       }, 500);
     } else {
+      // If popup blocked, still offer revive but clear high score input state
+      setShowHighScoreInput(false);
+      setNewHighScoreScore(null);
+      setPlayerNameInput('');
       revivePlayer();
     }
-  }, [revivePlayer, togglePause])
+  }, [revivePlayer, togglePause, setShowHighScoreInput, setNewHighScoreScore, setPlayerNameInput])
+
+  // Callback for showing high score input
+  const handleShowHighScoreInput = useCallback((score: number) => {
+    console.log('GameCanvas: handleShowHighScoreInput called with score:', score);
+    setNewHighScoreScore(score);
+    setPlayerNameInput(''); // Clear previous input
+    setShowHighScoreInput(true);
+    onGameStateChange('highScoreInput'); // Set game state to indicate high score input
+  }, [onGameStateChange]);
+
+  // Handle submitting the high score name
+  const handleSubmitHighScore = useCallback(() => {
+    console.log('GameCanvas: handleSubmitHighScore called. Player name:', playerNameInput, 'Score:', newHighScoreScore);
+    if (gameRef.current && newHighScoreScore !== null && playerNameInput.trim() !== '') {
+      gameRef.current.submitHighScore(playerNameInput.trim(), newHighScoreScore);
+      setShowHighScoreInput(false);
+      setNewHighScoreScore(null);
+      setPlayerNameInput('');
+      // Game state will be set back to 'gameOver' by submitHighScore
+    } else {
+      console.log('GameCanvas: Cannot submit high score. Invalid name or score.');
+    }
+  }, [gameRef, newHighScoreScore, playerNameInput]);
+
+  useEffect(() => {
+    console.log('GameCanvas: Current gameState prop:', gameState);
+    console.log('GameCanvas: showHighScoreInput state:', showHighScoreInput);
+    console.log('GameCanvas: newHighScoreScore state:', newHighScoreScore);
+    console.log('GameCanvas: playerDeathPosition state:', playerDeathPosition); // Added log
+  }, [gameState, showHighScoreInput, newHighScoreScore, playerDeathPosition]); // Added playerDeathPosition to dependencies
+
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -196,8 +267,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       onMissileCountUpdate: onMissileCountUpdate || (() => {}),
       onPlayerDeath: (x: number, y: number) => {
         setPlayerDeathPosition({ x, y })
-        onGameStateChange('gameOver')
+        // Removed onGameStateChange('gameOver') from here.
+        // The Game.ts endGame method will now handle the final state transition.
       },
+      onCurrencyUpdate: setPlayerCurrency,
+      onUpgradesUpdate: setPlayerUpgrades,
+      onHighScoresUpdate: setHighScores,
+      onShowHighScoreInput: handleShowHighScoreInput, // Pass the new callback
     }
 
     gameRef.current = new Game(ctx, gameCallbacks, selectedSkin) // Use internal selectedSkin state
@@ -207,7 +283,46 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         gameRef.current.destroy()
       }
     }
-  }, [onScoreUpdate, onLivesUpdate, onGameStateChange, onLevelUpdate, onMissileCountUpdate, selectedSkin]) // Add selectedSkin to dependency array
+  }, [onScoreUpdate, onLivesUpdate, onGameStateChange, onLevelUpdate, onMissileCountUpdate, selectedSkin, handleShowHighScoreInput]) // Add selectedSkin and handleShowHighScoreInput to dependency array
+
+  const getUpgradeDescription = (type: UpgradeType, level: number) => {
+    if (level >= MAX_UPGRADE_LEVELS[type]) {
+      return 'MAX LEVEL';
+    }
+    const nextLevel = level + 1;
+    const cost = UPGRADE_COSTS[type][level];
+    let effect = '';
+    switch (type) {
+      case 'fireRate':
+        effect = `Fire Rate: ${((1 - UPGRADE_EFFECTS.fireRate[level]) * 100).toFixed(0)}% faster`;
+        break;
+      case 'maxLives':
+        effect = `+${UPGRADE_EFFECTS.maxLives[level]} Max Lives`;
+        break;
+      case 'shieldHealth':
+        effect = `+${UPGRADE_EFFECTS.shieldHealth[level]} Shield Health`;
+        break;
+    }
+    return `Level ${nextLevel} - ${effect} - Cost: ${cost} 💰`;
+  };
+
+  const getUpgradeCurrentEffect = (type: UpgradeType, level: number) => {
+    if (level === 0) return 'None';
+    let effect = '';
+    switch (type) {
+      case 'fireRate':
+        effect = `${((1 - UPGRADE_EFFECTS.fireRate[level - 1]) * 100).toFixed(0)}% faster`;
+        break;
+      case 'maxLives':
+        effect = `+${UPGRADE_EFFECTS.maxLives[level - 1]} lives`;
+        break;
+      case 'shieldHealth':
+        effect = `+${UPGRADE_EFFECTS.shieldHealth[level - 1]} health`;
+        break;
+    }
+    return `Current: ${effect}`;
+  };
+
 
   return (
     <div className="relative bg-gray-900 rounded-lg shadow-lg overflow-hidden">
@@ -219,8 +334,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         className="block border border-gray-700 relative z-10"
       />
 
+      {console.log('GameCanvas: Rendering conditional UI. Current gameState:', gameState, 'showHighScoreInput:', showHighScoreInput)}
       {gameState !== 'playing' && gameState !== 'levelComplete' && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-75 text-white p-4 z-20">
+          {console.log('GameCanvas: Inside outer conditional div. Current gameState:', gameState, 'showHighScoreInput:', showHighScoreInput)}
           {gameState === 'start' && (
             <>
               <h2 className="text-4xl font-bold mb-4 text-lime-400">
@@ -246,6 +363,18 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
                 className="flex items-center px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-full text-xl transition-colors duration-200 mb-4"
               >
                 <Rocket className="mr-2" size={24} /> Ship Skin
+              </button>
+              <button
+                onClick={showUpgrades}
+                className="flex items-center px-6 py-3 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-full text-xl transition-colors duration-200 mb-4"
+              >
+                <DollarSign className="mr-2" size={24} /> Upgrades ({playerCurrency} 💰)
+              </button>
+              <button
+                onClick={showLeaderboard}
+                className="flex items-center px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold rounded-full text-xl transition-colors duration-200 mb-4"
+              >
+                <Trophy className="mr-2" size={24} /> High Scores
               </button>
               <button
                 onClick={showInstructions}
@@ -412,7 +541,176 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
               </button>
             </div>
           )}
-          {gameState === 'gameOver' && (
+          {gameState === 'upgrades' && (
+            <div className="text-center max-w-4xl mx-auto w-full h-full flex flex-col">
+              <h2 className="text-4xl font-bold mb-6 text-purple-400">
+                Permanent Upgrades
+              </h2>
+              <p className="text-2xl mb-6 text-yellow-400">
+                Your Currency: {playerCurrency} 💰
+              </p>
+              <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
+                  {/* Fire Rate Upgrade */}
+                  <div className="bg-gray-800 p-6 rounded-lg shadow-xl border border-purple-700">
+                    <h3 className="text-3xl font-bold text-cyan-400 mb-3">Fire Rate</h3>
+                    <p className="text-lg text-gray-300 mb-2">
+                      Current Level: {playerUpgrades.fireRate} ({getUpgradeCurrentEffect('fireRate', playerUpgrades.fireRate)})
+                    </p>
+                    <p className="text-md text-gray-400 mb-4">
+                      {getUpgradeDescription('fireRate', playerUpgrades.fireRate)}
+                    </p>
+                    <button
+                      onClick={() => handleBuyUpgrade('fireRate')}
+                      disabled={playerUpgrades.fireRate >= MAX_UPGRADE_LEVELS.fireRate || playerCurrency < (UPGRADE_COSTS.fireRate[playerUpgrades.fireRate] || Infinity)}
+                      className={`
+                        flex items-center justify-center px-6 py-3 rounded-full text-xl font-bold transition-colors duration-200 w-full
+                        ${playerUpgrades.fireRate >= MAX_UPGRADE_LEVELS.fireRate
+                          ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                          : 'bg-lime-500 hover:bg-lime-600 text-gray-900'
+                        }
+                      `}
+                    >
+                      {playerUpgrades.fireRate >= MAX_UPGRADE_LEVELS.fireRate ? 'MAXED' : 'Upgrade'}
+                    </button>
+                  </div>
+
+                  {/* Max Lives Upgrade */}
+                  <div className="bg-gray-800 p-6 rounded-lg shadow-xl border border-purple-700">
+                    <h3 className="text-3xl font-bold text-red-400 mb-3">Max Lives</h3>
+                    <p className="text-lg text-gray-300 mb-2">
+                      Current Level: {playerUpgrades.maxLives} ({getUpgradeCurrentEffect('maxLives', playerUpgrades.maxLives)})
+                    </p>
+                    <p className="text-md text-gray-400 mb-4">
+                      {getUpgradeDescription('maxLives', playerUpgrades.maxLives)}
+                    </p>
+                    <button
+                      onClick={() => handleBuyUpgrade('maxLives')}
+                      disabled={playerUpgrades.maxLives >= MAX_UPGRADE_LEVELS.maxLives || playerCurrency < (UPGRADE_COSTS.maxLives[playerUpgrades.maxLives] || Infinity)}
+                      className={`
+                        flex items-center justify-center px-6 py-3 rounded-full text-xl font-bold transition-colors duration-200 w-full
+                        ${playerUpgrades.maxLives >= MAX_UPGRADE_LEVELS.maxLives
+                          ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                          : 'bg-lime-500 hover:bg-lime-600 text-gray-900'
+                        }
+                      `}
+                    >
+                      {playerUpgrades.maxLives >= MAX_UPGRADE_LEVELS.maxLives ? 'MAXED' : 'Upgrade'}
+                    </button>
+                  </div>
+
+                  {/* Shield Health Upgrade */}
+                  <div className="bg-gray-800 p-6 rounded-lg shadow-xl border border-purple-700">
+                    <h3 className="text-3xl font-bold text-blue-400 mb-3">Shield Health</h3>
+                    <p className="text-lg text-gray-300 mb-2">
+                      Current Level: {playerUpgrades.shieldHealth} ({getUpgradeCurrentEffect('shieldHealth', playerUpgrades.shieldHealth)})
+                    </p>
+                    <p className="text-md text-gray-400 mb-4">
+                      {getUpgradeDescription('shieldHealth', playerUpgrades.shieldHealth)}
+                    </p>
+                    <button
+                      onClick={() => handleBuyUpgrade('shieldHealth')}
+                      disabled={playerUpgrades.shieldHealth >= MAX_UPGRADE_LEVELS.shieldHealth || playerCurrency < (UPGRADE_COSTS.shieldHealth[playerUpgrades.shieldHealth] || Infinity)}
+                      className={`
+                        flex items-center justify-center px-6 py-3 rounded-full text-xl font-bold transition-colors duration-200 w-full
+                        ${playerUpgrades.shieldHealth >= MAX_UPGRADE_LEVELS.shieldHealth
+                          ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                          : 'bg-lime-500 hover:bg-lime-600 text-gray-900'
+                        }
+                      `}
+                    >
+                      {playerUpgrades.shieldHealth >= MAX_UPGRADE_LEVELS.shieldHealth ? 'MAXED' : 'Upgrade'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={hideUpgrades}
+                className="flex items-center px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-full text-xl transition-colors duration-200 mt-6 mx-auto"
+              >
+                <ArrowLeft className="mr-2" size={24} /> Back to Main Menu
+              </button>
+            </div>
+          )}
+          {gameState === 'leaderboard' && (
+            <div className="text-center max-w-2xl mx-auto w-full h-full flex flex-col">
+              <h2 className="text-4xl font-bold mb-6 text-yellow-400">
+                High Scores
+              </h2>
+              <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar">
+                {highScores.length > 0 ? (
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-700">
+                        <th className="p-3 text-xl text-gray-200">Rank</th>
+                        <th className="p-3 text-xl text-gray-200">Name</th>
+                        <th className="p-3 text-xl text-gray-200">Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {highScores.map((entry, index) => (
+                        <tr key={index} className={`${index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-900'} hover:bg-gray-700 transition-colors duration-150`}>
+                          <td className="p-3 text-lg text-white">{index + 1}</td>
+                          <td className="p-3 text-lg text-lime-300">{entry.name}</td>
+                          <td className="p-3 text-lg text-yellow-300">{entry.score}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="text-xl text-gray-400">No high scores yet. Play a game to set one!</p>
+                )}
+              </div>
+              <button
+                onClick={hideLeaderboard}
+                className="flex items-center px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-full text-xl transition-colors duration-200 mt-6 mx-auto"
+              >
+                <ArrowLeft className="mr-2" size={24} /> Back to Main Menu
+              </button>
+            </div>
+          )}
+          {gameState === 'highScoreInput' && showHighScoreInput && newHighScoreScore !== null && (
+            <div className="text-center max-w-md mx-auto w-full p-6 bg-gray-800 rounded-lg shadow-xl border border-yellow-500">
+              <h2 className="text-4xl font-bold mb-4 text-yellow-400">
+                New High Score!
+              </h2>
+              <p className="text-2xl mb-6 text-gray-300">
+                Your Score: <span className="font-bold text-lime-400">{newHighScoreScore}</span>
+              </p>
+              <p className="text-xl mb-4 text-white">
+                Enter your name (Max 10 chars):
+              </p>
+              <input
+                type="text"
+                value={playerNameInput}
+                onChange={(e) => setPlayerNameInput(e.target.value.slice(0, 10))}
+                maxLength={10}
+                className="w-full p-3 mb-6 text-center text-xl bg-gray-700 text-white rounded-md border border-gray-600 focus:outline-none focus:border-lime-500"
+                placeholder="Your Name"
+                autoFocus
+              />
+              <button
+                onClick={handleSubmitHighScore}
+                disabled={playerNameInput.trim() === ''}
+                className={`
+                  flex items-center justify-center px-6 py-3 rounded-full text-xl font-bold transition-colors duration-200 w-full
+                  ${playerNameInput.trim() === ''
+                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                    : 'bg-lime-500 hover:bg-lime-600 text-gray-900'
+                  }
+                `}
+              >
+                Submit Score
+              </button>
+              <button
+                onClick={openAdPopup}
+                className="flex items-center justify-center px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-full text-xl transition-colors duration-200 mt-4 w-full"
+              >
+                Revive after watching Ad
+              </button>
+            </div>
+          )}
+          {gameState === 'gameOver' && !showHighScoreInput && (
             <>
               <h2 className="text-5xl font-bold mb-4 text-red-500">
                 GAME OVER!
@@ -431,12 +729,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
                 className="flex items-center px-6 py-3 bg-lime-500 hover:bg-lime-600 text-gray-900 font-bold rounded-full text-xl transition-colors duration-200"
               >
                 <RefreshCw className="mr-2" size={24} /> Play Again
-              </button>
-              <button
-                onClick={openAdPopup}
-                className="flex items-center px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-full text-xl transition-colors duration-200 mt-4"
-              >
-                Revive after watching Ad
               </button>
             </>
           )}
