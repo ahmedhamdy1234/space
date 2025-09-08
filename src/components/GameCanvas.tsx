@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import { Game, GameState, PlayerUpgrades, HighScore, UpgradeType } from '../game/game'
 import { CANVAS_HEIGHT, CANVAS_WIDTH, GAME_LIVES, DEFAULT_SHIP_SKIN, MAX_LEVELS, UPGRADE_COSTS, MAX_UPGRADE_LEVELS, UPGRADE_EFFECTS } from '../game/constants' // Import MAX_LEVELS
-import { Play, RefreshCw, Pause, Info, User, Rocket, LogOut, Palette, ListOrdered, DollarSign, Trophy, ArrowLeft } from 'lucide-react' // Import ListOrdered icon
+import { Play, RefreshCw, Pause, Info, User, Rocket, LogOut, Palette, ListOrdered, DollarSign, Trophy, ArrowLeft, ZoomIn, ZoomOut, Maximize } from 'lucide-react' // Import ListOrdered and Zoom icons
 import Starfield from './Starfield' // Import Starfield component
 import ShipPreviewCanvas from './ShipPreviewCanvas' // Import ShipPreviewCanvas
 
@@ -78,6 +78,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   const [showHighScoreInput, setShowHighScoreInput] = useState<boolean>(false);
   const [newHighScoreScore, setNewHighScoreScore] = useState<number | null>(null);
   const [playerNameInput, setPlayerNameInput] = useState<string>('');
+
+  // State for zoom level
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('selectedShipSkin', selectedSkin)
@@ -244,6 +247,17 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     }
   }, [gameRef, newHighScoreScore, playerNameInput]);
 
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    } else {
+      const element = document.documentElement;
+      element.requestFullscreen();
+      setIsFullscreen(true);
+    }
+  }, []);
+
   useEffect(() => {
     console.log('GameCanvas: Current gameState prop:', gameState);
     console.log('GameCanvas: showHighScoreInput state:', showHighScoreInput);
@@ -276,14 +290,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       onShowHighScoreInput: handleShowHighScoreInput, // Pass the new callback
     }
 
-    gameRef.current = new Game(ctx, gameCallbacks, selectedSkin) // Use internal selectedSkin state
+    gameRef.current = new Game(ctx, gameCallbacks, selectedSkin) // Removed zoomLevel from Game constructor
 
     return () => {
       if (gameRef.current) {
         gameRef.current.destroy()
       }
     }
-  }, [onScoreUpdate, onLivesUpdate, onGameStateChange, onLevelUpdate, onMissileCountUpdate, selectedSkin, handleShowHighScoreInput]) // Add selectedSkin and handleShowHighScoreInput to dependency array
+  }, [onScoreUpdate, onLivesUpdate, onGameStateChange, onLevelUpdate, onMissileCountUpdate, selectedSkin, handleShowHighScoreInput]) // Removed currentZoomLevel from dependency array
 
   const getUpgradeDescription = (type: UpgradeType, level: number) => {
     if (level >= MAX_UPGRADE_LEVELS[type]) {
@@ -326,7 +340,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
   return (
     <div className="relative bg-gray-900 rounded-lg shadow-lg overflow-hidden">
-      <Starfield level={level} /> {/* Pass the current level to Starfield */}
+      <Starfield level={level} /> {/* Pass the current level and zoom level to Starfield */}
       <canvas
         ref={canvasRef}
         width={CANVAS_WIDTH}
@@ -798,13 +812,22 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       )}
 
       {gameState === 'playing' && (
-        <button
-          onClick={togglePause}
-          className="absolute top-4 right-4 p-2 bg-gray-700 hover:bg-gray-600 text-white rounded-full shadow-lg transition-colors duration-200 z-20"
-          title="Pause Game (P)"
-        >
-          <Pause size={24} />
-        </button>
+        <div className="absolute top-4 right-4 flex items-center space-x-2 z-20">
+          <button
+            onClick={togglePause}
+            className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded-full shadow-lg transition-colors duration-200"
+            title="Pause Game (P)"
+          >
+            <Pause size={24} />
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded-full shadow-lg transition-colors duration-200"
+            title="Toggle Fullscreen"
+          >
+            <Maximize size={24} />
+          </button>
+        </div>
       )}
     </div>
   )
