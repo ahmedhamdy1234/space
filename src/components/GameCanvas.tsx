@@ -418,6 +418,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
                       <li>✨ Piercing Shot: Bullets pass through multiple enemies.</li>
                       <li>❤️ Extra Life: Grants an additional life.</li>
                       <li>🛡️ Shield Repair: Repairs all damaged shields.</li>
+                      <li>🤖 Bot Kill: Spawns a temporary bot player to assist you.</li>
                     </ul>
                   </li>
                   <li><b>Missiles:</b> Powerful projectiles that deal high damage.
@@ -427,8 +428,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
                     </ul>
                   </li>
                   <li><b>Boss Invaders:</b> Appear every few levels. They are tougher and have more health.</li>
-                  <li><b>Kamikaze Invaders:</b> (New!) These fast, red triangular invaders fly directly towards you. Destroy them before they collide, as they deal damage on impact!</li>
+                  <li><b>Kamikaze Invaders:</b> These fast, red triangular invaders fly directly towards you. Destroy them before they collide, as they deal damage on impact!</li>
+                  <li><b>Diving Invaders:</b> These invaders dive directly towards the player, attempting to collide.</li>
+                  <li><b>Split Invaders:</b> When destroyed, these invaders split into two smaller, weaker invaders.</li>
+                  <li><b>Mine-Laying Invaders:</b> These invaders periodically drop mines that explode on contact with the player or player bullets.</li>
                   <li><b>Player Invincibility:</b> After taking damage, you become temporarily invincible (flashing effect).</li>
+                  <li><b>Permanent Upgrades:</b> Earn currency by playing to unlock permanent upgrades for fire rate, max lives, and shield health.</li>
+                  <li><b>High Score Leaderboard:</b> Compete for the top spot on the local high score leaderboard!</li>
                 </ul>
               </div>
               <button
