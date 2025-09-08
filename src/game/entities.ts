@@ -68,6 +68,7 @@ import {
   MINE_SIZE, // Import for Mine size
   MINE_DAMAGE, // Import for Mine damage
   MINE_LIFETIME, // Import for Mine lifetime
+  UPGRADE_EFFECTS, // Import upgrade effects
 } from './constants'
 
 export class Player {
@@ -90,8 +91,9 @@ export class Player {
   lastMissileFireTime: number // New property for missile cooldown
   skin: string // New property for player ship skin
   canFireMissile: boolean // New property to control single missile fire per key press
+  fireRateLimit: number // Actual fire rate limit, affected by permanent upgrades
 
-  constructor(x?: number, y?: number, skin: string = DEFAULT_SHIP_SKIN) {
+  constructor(x?: number, y?: number, skin: string = DEFAULT_SHIP_SKIN, permanentFireRateLevel: number = 0) {
     this.width = PLAYER_WIDTH
     this.height = PLAYER_HEIGHT
     this.x = x !== undefined ? x : CANVAS_WIDTH / 2 - this.width / 2
@@ -111,6 +113,13 @@ export class Player {
     this.lastMissileFireTime = 0 // Initialize missile cooldown
     this.skin = skin // Initialize skin
     this.canFireMissile = true // Initialize to true, allows firing on first press
+
+    // Apply permanent fire rate upgrade
+    this.fireRateLimit = PLAYER_FIRE_RATE_LIMIT;
+    if (permanentFireRateLevel > 0) {
+      const multiplier = UPGRADE_EFFECTS.fireRate[permanentFireRateLevel - 1];
+      this.fireRateLimit = PLAYER_FIRE_RATE_LIMIT * multiplier;
+    }
   }
 
   draw(ctx: CanvasRenderingContext2D) {
@@ -305,7 +314,7 @@ export class Player {
 
     // Continuous firing logic
     const now = Date.now()
-    if (this.isFiringHeld && (now - this.lastFireTime > PLAYER_FIRE_RATE_LIMIT)) {
+    if (this.isFiringHeld && (now - this.lastFireTime > this.fireRateLimit)) { // Use this.fireRateLimit
       this.fireBullet()
       this.lastFireTime = now
     }
@@ -1145,12 +1154,12 @@ export class Shield {
   maxHealth: number
   isDestroyed: boolean
 
-  constructor(x: number, y: number) {
+  constructor(x: number, y: number, permanentShieldHealthLevel: number = 0) {
     this.x = x
     this.y = y
     this.width = SHIELD_WIDTH
     this.height = SHIELD_HEIGHT
-    this.maxHealth = SHIELD_HEALTH
+    this.maxHealth = SHIELD_HEALTH + (permanentShieldHealthLevel > 0 ? UPGRADE_EFFECTS.shieldHealth[permanentShieldHealthLevel - 1] : 0);
     this.health = this.maxHealth
     this.isDestroyed = false
   }
@@ -1160,14 +1169,14 @@ export class Shield {
 
     // Determine color based on health
     let color = ''
-    if (this.health === 3) {
-      color = '#00FF00' // Green
-    } else if (this.health === 2) {
+    if (this.health === this.maxHealth) {
+      color = '#00FF00' // Green (full health)
+    } else if (this.health >= this.maxHealth * 0.66) {
+      color = '#ADFF2F' // GreenYellow
+    } else if (this.health >= this.maxHealth * 0.33) {
       color = '#FFFF00' // Yellow
-    } else if (this.health === 1) {
-      color = '#FFA500' // Orange
     } else {
-      color = '#FF0000' // Red (shouldn't happen if destroyed is true)
+      color = '#FFA500' // Orange (low health)
     }
 
     ctx.fillStyle = color

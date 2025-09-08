@@ -82,6 +82,13 @@ import {
   DIVING_INVADER_SPAWN_CHANCE_HIGH_LEVEL, // Import for high level Diving Invader spawn chance
   SPLIT_INVADER_SPAWN_CHANCE_HIGH_LEVEL, // Import for high level Split Invader spawn chance
   MINE_LAYING_INVADER_SPAWN_CHANCE_HIGH_LEVEL, // Import for high level Mine-Laying Invader spawn chance
+  INITIAL_PLAYER_CURRENCY, // Import initial player currency
+  CURRENCY_PER_SCORE_POINT, // Import currency per score point
+  MAX_UPGRADE_LEVELS, // Import max upgrade levels
+  UPGRADE_COSTS, // Import upgrade costs
+  UPGRADE_EFFECTS,
+  PLAYER_FIRE_RATE_LIMIT, // Import upgrade effects
+  LEADERBOARD_SIZE, // Import leaderboard size
 } from './constants'
 
 import {
@@ -102,7 +109,20 @@ import {
   Mine, // Import Mine
 } from './entities'
 
-export type GameState = 'start' | 'playing' | 'gameOver' | 'won' | 'paused' | 'instructions' | 'levelComplete' | 'about' | 'shipSkinSelection' | 'bossRush' | 'levelSelection' // Added 'bossRush' and 'levelSelection'
+export type GameState = 'start' | 'playing' | 'gameOver' | 'won' | 'paused' | 'instructions' | 'levelComplete' | 'about' | 'shipSkinSelection' | 'bossRush' | 'levelSelection' | 'upgrades' | 'leaderboard' | 'highScoreInput' // Added 'upgrades', 'leaderboard', and 'highScoreInput'
+
+export type UpgradeType = 'fireRate' | 'maxLives' | 'shieldHealth';
+
+export interface PlayerUpgrades {
+  fireRate: number;
+  maxLives: number;
+  shieldHealth: number;
+}
+
+export interface HighScore {
+  name: string;
+  score: number;
+}
 
 interface GameCallbacks {
   onScoreUpdate: (score: number) => void
@@ -111,6 +131,10 @@ interface GameCallbacks {
   onLevelUpdate: (level: number) => void
   onPlayerDeath?: (x: number, y: number) => void
   onMissileCountUpdate: (count: number) => void // Added missile count update callback
+  onCurrencyUpdate: (currency: number) => void; // New callback for currency
+  onUpgradesUpdate: (upgrades: PlayerUpgrades) => void; // New callback for upgrades
+  onHighScoresUpdate: (highScores: HighScore[]) => void; // New callback for high scores
+  onShowHighScoreInput: (score: number) => void; // New callback to show high score input
 }
 
 export class Game {
@@ -145,19 +169,21 @@ export class Game {
   private selectedSkin: string // New property for selected skin
   private isBossRushMode: boolean // New property for Boss Rush mode
 
+  // Permanent Upgrade System & Leaderboard
+  private playerCurrency: number;
+  private playerUpgrades: PlayerUpgrades;
+  private highScores: HighScore[];
+
   constructor(ctx: CanvasRenderingContext2D, callbacks: GameCallbacks, selectedSkin: string = DEFAULT_SHIP_SKIN) {
     this.ctx = ctx
     this.callbacks = callbacks
     this.selectedSkin = selectedSkin // Initialize selected skin
-    this.player = new Player(undefined, undefined, this.selectedSkin) // Pass selected skin to Player
-    this.botPlayer = null // Initialize bot player
     this.invaders = []
     this.shields = []
     this.boosts = []
     this.explosions = []
     this.mines = [] // Initialize mines
     this.score = 0
-    this.lives = GAME_LIVES
     this.gameState = 'start'
     this.animationFrameId = null
     this.invaderDirection = 1
@@ -180,13 +206,166 @@ export class Game {
     this.hasWon = false
     this.isBossRushMode = false // Initialize Boss Rush mode to false
 
+    // Initialize permanent upgrades and leaderboard
+    this.playerCurrency = INITIAL_PLAYER_CURRENCY;
+    this.playerUpgrades = { fireRate: 0, maxLives: 0, shieldHealth: 0 };
+    this.highScores = [];
+
+    this.loadGameData(); // Load data from localStorage
+    this.player = new Player(undefined, undefined, this.selectedSkin, this.playerUpgrades.fireRate); // Initialize player with upgrades
+    this.botPlayer = null; // Initialize bot player
+    this.lives = GAME_LIVES + this.playerUpgrades.maxLives; // Apply permanent lives upgrade
+
     this.setupEventListeners()
     this.callbacks.onScoreUpdate(this.score)
     this.callbacks.onLivesUpdate(this.lives)
     this.callbacks.onGameStateChange(this.gameState)
     this.callbacks.onLevelUpdate(this.currentLevel)
     this.callbacks.onMissileCountUpdate(this.player.missileCount) // Initial missile count update
+    this.callbacks.onCurrencyUpdate(this.playerCurrency); // Initial currency update
+    this.callbacks.onUpgradesUpdate(this.playerUpgrades); // Initial upgrades update
+    this.callbacks.onHighScoresUpdate(this.highScores); // Initial high scores update
   }
+
+  private loadGameData() {
+    try {
+      const savedCurrency = localStorage.getItem('playerCurrency');
+      if (savedCurrency) {
+        this.playerCurrency = JSON.parse(savedCurrency);
+      }
+
+      const savedUpgrades = localStorage.getItem('playerUpgrades');
+      if (savedUpgrades) {
+        this.playerUpgrades = JSON.parse(savedUpgrades);
+      }
+
+      const savedHighScores = localStorage.getItem('highScores');
+      if (savedHighScores) {
+        this.highScores = JSON.parse(savedHighScores);
+      }
+    } catch (error) {
+      console.error('Error loading game data from localStorage:', error);
+      // Reset to default if loading fails
+      this.playerCurrency = INITIAL_PLAYER_CURRENCY;
+      this.playerUpgrades = { fireRate: 0, maxLives: 0, shieldHealth: 0 };
+      this.highScores = [];
+    }
+  }
+
+  private saveGameData() {
+    try {
+      localStorage.setItem('playerCurrency', JSON.stringify(this.playerCurrency));
+      localStorage.setItem('playerUpgrades', JSON.stringify(this.playerUpgrades));
+      localStorage.setItem('highScores', JSON.stringify(this.highScores));
+    } catch (error) {
+      console.error('Error saving game data to localStorage:', error);
+    }
+  }
+
+  private applyPermanentUpgrades() {
+    // Apply fire rate upgrade to player
+    this.player.fireRateLimit = PLAYER_FIRE_RATE_LIMIT;
+    if (this.playerUpgrades.fireRate > 0) {
+      const multiplier = UPGRADE_EFFECTS.fireRate[this.playerUpgrades.fireRate - 1];
+      this.player.fireRateLimit = PLAYER_FIRE_RATE_LIMIT * multiplier;
+    }
+
+    // Apply max lives upgrade
+    this.lives = GAME_LIVES + this.playerUpgrades.maxLives;
+    this.callbacks.onLivesUpdate(this.lives);
+
+    // Shields are spawned/repaired with upgraded health in spawnShields
+  }
+
+  private awardCurrency(score: number) {
+    this.playerCurrency += Math.floor(score * CURRENCY_PER_SCORE_POINT);
+    this.callbacks.onCurrencyUpdate(this.playerCurrency);
+    this.saveGameData();
+  }
+
+  private checkHighScore(score: number) {
+    if (score <= 0) return;
+
+    const lowestHighScore = this.highScores.length < LEADERBOARD_SIZE ? 0 : this.highScores[this.highScores.length - 1].score;
+
+    console.log('Game: checkHighScore called. Current score:', score, 'Lowest high score:', lowestHighScore);
+
+    if (score > lowestHighScore) {
+      console.log('Game: New high score detected! Triggering onShowHighScoreInput and setting internal gameState to highScoreInput.');
+      this.gameState = 'highScoreInput'; // Update internal game state
+      this.callbacks.onShowHighScoreInput(score); // Trigger UI to show input
+    } else {
+      console.log('Game: Score not high enough for leaderboard. Internal gameState remains:', this.gameState);
+    }
+  }
+
+  public submitHighScore(name: string, score: number) {
+    console.log('Game: submitHighScore called with name:', name, 'score:', score);
+    const newScore: HighScore = { name: name.substring(0, 10), score: score };
+    this.highScores.push(newScore);
+    this.highScores.sort((a, b) => b.score - a.score);
+    this.highScores = this.highScores.slice(0, LEADERBOARD_SIZE);
+    this.callbacks.onHighScoresUpdate(this.highScores);
+    this.saveGameData();
+    this.callbacks.onGameStateChange('gameOver'); // Return to game over screen after submission
+    console.log('Game: High score submitted. Game state changed to gameOver.');
+  }
+
+  public buyUpgrade(type: UpgradeType): boolean {
+    const currentLevel = this.playerUpgrades[type];
+    if (currentLevel >= MAX_UPGRADE_LEVELS[type]) {
+      console.log(`Max level reached for ${type}`);
+      return false;
+    }
+
+    const cost = UPGRADE_COSTS[type][currentLevel];
+    if (this.playerCurrency >= cost) {
+      this.playerCurrency -= cost;
+      (this.playerUpgrades[type] as number)++; // Increment upgrade level
+      this.saveGameData();
+      this.callbacks.onCurrencyUpdate(this.playerCurrency);
+      this.callbacks.onUpgradesUpdate(this.playerUpgrades);
+      this.applyPermanentUpgrades(); // Re-apply upgrades immediately
+      console.log(`Upgraded ${type} to level ${this.playerUpgrades[type]}`);
+      return true;
+    } else {
+      console.log(`Not enough currency to upgrade ${type}. Needed: ${cost}, Have: ${this.playerCurrency}`);
+      return false;
+    }
+  }
+
+  public getPlayerCurrency(): number {
+    return this.playerCurrency;
+  }
+
+  public getPlayerUpgrades(): PlayerUpgrades {
+    return this.playerUpgrades;
+  }
+
+  public getHighScores(): HighScore[] {
+    return this.highScores;
+  }
+
+  public showUpgradesScreen = () => {
+    this.gameState = 'upgrades';
+    this.callbacks.onGameStateChange(this.gameState);
+  }
+
+  public hideUpgradesScreen = () => {
+    this.gameState = 'start';
+    this.callbacks.onGameStateChange(this.gameState);
+  }
+
+  public showLeaderboardScreen = () => {
+    this.gameState = 'leaderboard';
+    this.callbacks.onGameStateChange(this.gameState);
+  }
+
+  public hideLeaderboardScreen = () => {
+    this.gameState = 'start';
+    this.callbacks.onGameStateChange(this.gameState);
+  }
+
 
   private setupEventListeners() {
     document.addEventListener('keydown', this.handleKeyDown)
@@ -281,6 +460,8 @@ export class Game {
     this.isBossRushMode = true
     this.gameState = 'playing'
     this.callbacks.onGameStateChange(this.gameState)
+    this.spawnInvaders() // Boss rush spawns bosses
+    this.spawnShields() // Shields will be empty in boss rush
     this.loop()
   }
 
@@ -304,7 +485,7 @@ export class Game {
       cancelAnimationFrame(this.animationFrameId)
     }
     // Create a new Player instance to reset all player properties, including level upgrades
-    this.player = new Player(undefined, undefined, this.selectedSkin)
+    this.player = new Player(undefined, undefined, this.selectedSkin, this.playerUpgrades.fireRate) // Pass selected skin and permanent fire rate
     this.botPlayer = null // Reset bot player
     this.invaders = []
     this.shields = []
@@ -312,7 +493,7 @@ export class Game {
     this.explosions = []
     this.mines = [] // Reset mines
     this.score = 0
-    this.lives = GAME_LIVES
+    this.lives = GAME_LIVES + this.playerUpgrades.maxLives // Apply permanent lives upgrade
     this.gameState = 'start'
     this.animationFrameId = null
     this.invaderDirection = 1
@@ -328,7 +509,6 @@ export class Game {
 
     // Do not spawn invaders/shields here, let startGame handle it based on selected level
     this.score = 0
-    this.lives = GAME_LIVES
     this.invaderDirection = 1
     this.callbacks.onScoreUpdate(this.score)
     this.callbacks.onLivesUpdate(this.lives)
@@ -347,7 +527,7 @@ export class Game {
     // Reset player's position and state (new Player instance)
     // This will also reset level-based upgrades, which might not be desired on revive.
     // For now, we'll keep it simple and fully reset the player.
-    this.player = new Player(undefined, undefined, this.selectedSkin); // Pass selected skin on revive
+    this.player = new Player(undefined, undefined, this.selectedSkin, this.playerUpgrades.fireRate); // Pass selected skin on revive
     this.player.missileCount = MISSILE_INITIAL_COUNT; // Ensure missiles are reset/given on revive
     this.player.canFireMissile = true; // Reset canFireMissile on revive
 
@@ -485,10 +665,13 @@ export class Game {
       return;
     }
 
+    // Apply permanent shield health upgrade
+    const permanentShieldHealth = this.playerUpgrades.shieldHealth;
+
     if (this.shields.length === 0 || this.shields.every((s) => s.isDestroyed)) {
       const shieldSpacing = (CANVAS_WIDTH - NUMBER_OF_SHIELDS * SHIELD_WIDTH) / (NUMBER_OF_SHIELDS + 1)
       for (let i = 0; i < NUMBER_OF_SHIELDS; i++) {
-        this.shields.push(new Shield(shieldSpacing * (i + 1) + i * SHIELD_WIDTH, CANVAS_HEIGHT - SHIELD_Y_OFFSET - SHIELD_HEIGHT))
+        this.shields.push(new Shield(shieldSpacing * (i + 1) + i * SHIELD_WIDTH, CANVAS_HEIGHT - SHIELD_Y_OFFSET - SHIELD_HEIGHT, permanentShieldHealth))
       }
     } else {
       this.shields.forEach((shield) => shield.repair(shield.maxHealth))
@@ -1197,21 +1380,26 @@ export class Game {
   }
 
   private endGame(state: 'gameOver' | 'won') {
-    this.gameState = state
-    if (state === 'won' && !this.hasWon) {
-      this.callbacks.onGameStateChange(this.gameState)
-      this.hasWon = true
-    } else if (state === 'gameOver') {
-      this.callbacks.onGameStateChange(this.gameState)
-    }
+    console.log('Game: endGame called with state:', state);
+    this.gameState = state; // Set initial internal state
+
     if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId)
-      this.animationFrameId = null
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
     }
 
-    this.resetPlayerBoosts() // Centralized boost reset (only temporary boosts)
+    this.resetPlayerBoosts();
+    this.player.isFiringHeld = false;
 
-    this.player.isFiringHeld = false
+    // Handle currency and high scores
+    this.awardCurrency(this.score);
+    console.log('Game: Calling checkHighScore with score:', this.score);
+    this.checkHighScore(this.score); // This might change this.gameState to 'highScoreInput' via callback
+
+    // After checkHighScore, this.gameState holds the final desired state ('gameOver' or 'highScoreInput')
+    // Now, update the React component's state via callback
+    console.log('Game: Final game state to report to UI:', this.gameState);
+    this.callbacks.onGameStateChange(this.gameState);
   }
 
   public destroy() {

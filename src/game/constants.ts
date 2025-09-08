@@ -131,3 +131,28 @@ export const UNPREDICTABLE_MOVE_DOWN_CHANCE = 0.001 // 0.1% chance per frame for
 export const INVADER_UNPREDICTABLE_SPEED_MULTIPLIER = 0.7 // 30% speed DECREASE for regular invaders (making them weaker)
 export const INVADER_UNPREDICTABLE_FIRE_RATE_MULTIPLIER = 1.5 // 50% fire rate increase for regular invaders
 export const INVADER_UNPREDICTABLE_HEALTH_MULTIPLIER = 1.5 // 50% health increase for regular invaders
+
+// Permanent Upgrades
+export const INITIAL_PLAYER_CURRENCY = 0
+export const CURRENCY_PER_SCORE_POINT = 0.1 // 1 currency for every 10 score points
+
+export const MAX_UPGRADE_LEVELS = {
+  fireRate: 5,
+  maxLives: 3, // Max 3 additional lives
+  shieldHealth: 3, // Max 3 additional shield health
+}
+
+export const UPGRADE_COSTS = {
+  fireRate: [1000, 2500, 5000, 10000, 20000], // Cost for level 1, 2, 3, 4, 5
+  maxLives: [5000, 15000, 30000], // Cost for +1, +2, +3 lives
+  shieldHealth: [3000, 8000, 18000], // Cost for +1, +2, +3 shield health
+}
+
+export const UPGRADE_EFFECTS = {
+  fireRate: [0.9, 0.8, 0.7, 0.6, 0.5], // Multiplier for PLAYER_FIRE_RATE_LIMIT (e.g., 0.9 means 90% of original)
+  maxLives: [1, 2, 3], // Additional lives
+  shieldHealth: [1, 2, 3], // Additional shield health
+}
+
+// Leaderboard
+export const LEADERBOARD_SIZE = 5 // Top 5 scores
