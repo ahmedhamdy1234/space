@@ -1,5 +1,5 @@
-export const CANVAS_WIDTH = 800
-export const CANVAS_HEIGHT = 600
+export const CANVAS_WIDTH = 1800
+export const CANVAS_HEIGHT = 1600
 export const PLAYER_WIDTH = 40
 export const PLAYER_HEIGHT = 20
 export const PLAYER_SPEED = 5
